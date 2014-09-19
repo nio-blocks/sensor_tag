@@ -1,0 +1,3 @@
+[submodule "bluepy"]
+	path = bluepy
+	url = git@github.com:IanHarvey/bluepy.git
