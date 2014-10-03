@@ -1,3 +1,4 @@
+from datetime import timedelta
 from .bluepy.bluepy.sensortag import SensorTag
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
@@ -9,8 +10,12 @@ from nio.metadata.properties.list import ListProperty
 from nio.metadata.properties.string import StringProperty
 from nio.metadata.properties.timedelta import TimeDeltaProperty
 from nio.metadata.properties.bool import BoolProperty
+from nio.common.command.params.int import IntParameter
+from nio.common.command.params.list import ListParameter
+from nio.common.command.params.string import StringParameter
 from nio.modules.scheduler import Job
 from nio.modules.threading import spawn
+from nio.util.attribute_dict import AttributeDict
 
 AVAIL_SENSORS = {
     'IRtemperature': ['ambient_temp_degC', 'target_temp_degC'],
@@ -38,8 +43,13 @@ class SensorTagInfo(PropertyHolder):
     read_interval = TimeDeltaProperty(title="Device Read Interval")
     sensors = ObjectProperty(Sensors)
 
-
-@command("discover")
+@command("discover",
+         StringParameter('address', default=''),
+         StringParameter('name', default=''),
+         IntParameter('seconds', default=1),
+         ListParameter('sensors', default=['IRtemperature']))
+@command("connect")
+@command("reschedule")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
@@ -62,22 +72,37 @@ class SensorTagRead(Block):
         super().stop()
         self._cancel_existing_jobs()
 
-    def discover(self):
-        spawn(self._discover_helper)
+    def discover(self, address, name, seconds, sensors):
+        spawn(self._discover_new, address, name, seconds, sensors)
 
-    def _discover_helper(self):
+    def connect(self):
+        spawn(self._connect_configured)
+        
+    def reschedule(self):
+        self._schedule_read_jobs()
+
+    def _discover_new(self, address, name, seconds, sensors):
+        cfg = AttributeDict({
+            'address': address,
+            'name': name,
+            'read_interval': timedelta(seconds=seconds),
+            'sensors': AttributeDict({
+                s: (s in sensors) for s in AVAIL_SENSORS
+            })
+        })
+        self._connect_tag(cfg)
+        cfg, tag = self._tags.get(address, (None, None))
+        if tag is not None:
+            sensors = self._get_sensors(cfg, tag)
+            [s.enable() for s in sensors]
+            self._sensors[address] = sensors
+            job = Job(self._read_from_tag, cfg.read_interval,
+                      True, cfg, self._sensors[address])
+            self._read_jobs.append(job)
+
+    def _connect_configured(self):
         for cfg in self.device_info:
-            addy = cfg.address
-            try:
-                self._logger.info("Push {} side button NOW".format(cfg.name))
-                self._tags[addy] = (cfg, SensorTag(addy))
-            except Exception as e:
-                self._logger.error(
-                    "Failed to connect to {} ({}): {}: {}".format(
-                        cfg.name, cfg.address, type(e).__name__, str(e))
-                )
-            else:
-                self._logger.info("Connected to device {}".format(addy))
+            self._connect_tag(cfg)
 
         self._logger.info(
             "Successfully connected to {} SensorTags".format(
@@ -91,6 +116,21 @@ class SensorTagRead(Block):
             self._sensors[addy] = sensors
 
         self._schedule_read_jobs()
+
+    def _connect_tag(self, cfg):
+        result = None
+        addy = cfg.address
+        name = cfg.name
+        try:
+            self._logger.info("Push {} side button NOW".format(name))
+            self._tags[addy] = (cfg, SensorTag(addy))
+        except Exception as e:
+            self._logger.error(
+                "Failed to connect to {} ({}): {}: {}".format(
+                    name, addy, type(e).__name__, str(e))
+            )
+        else:
+            self._logger.info("Connected to device {}".format(addy))
 
     def _schedule_read_jobs(self):
         self._cancel_existing_jobs()
@@ -110,12 +150,24 @@ class SensorTagRead(Block):
                 if getattr(settings, s)]
 
     def _read_from_tag(self, cfg, sensors):
-        self._logger.debug("Reading from {}...".format(cfg.name))
-        data = {s.ident: self._read_and_process(s) for s in sensors}
-        data['sensor_tag_name'] = cfg.name
-        data['sensor_tag_address'] = cfg.address
-        sig = Signal(data)
-        self.notify_signals([sig])
+        try:
+            self._logger.debug("Reading from {}...".format(cfg.name))
+            data = {s.ident: self._read_and_process(s) for s in sensors}
+            data['sensor_tag_name'] = cfg.name
+            data['sensor_tag_address'] = cfg.address
+            sig = Signal(data)
+            self.notify_signals([sig])
+        except Exception as e:
+            if cfg.address in self._tags:
+                del self._tags[cfg.address]
+                self._logger.error(
+                    "Error reading from {}: {}: {}".format(
+                        cfg.name, type(e).__name__, str(e))
+                    )
+            else:
+                self._logger.error(
+                    "Lost connection to {}...consider reschedule".format(
+                        cfg.name))
 
     def _read_and_process(self, sensor):
         data = sensor.read()
