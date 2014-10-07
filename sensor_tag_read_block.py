@@ -1,5 +1,6 @@
 from datetime import timedelta
 from .bluepy.bluepy.sensortag import SensorTag
+from .bluepy.bluepy.btle import LEScanner
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
 from nio.common.command import command
@@ -50,6 +51,7 @@ class SensorTagInfo(PropertyHolder):
          ListParameter('sensors', default=['IRtemperature']))
 @command("connect")
 @command("reschedule")
+@command("scan")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
@@ -57,6 +59,7 @@ class SensorTagRead(Block):
     
     def __init__(self):
         super().__init__()
+        self._scanner = LEScanner('SensorTag')
         self._tags = {}
         self._sensors = {}
         self._read_jobs = []
@@ -73,13 +76,26 @@ class SensorTagRead(Block):
         self._cancel_existing_jobs()
 
     def discover(self, address, name, seconds, sensors):
-        spawn(self._discover_new, address, name, seconds, sensors)
+        if address:
+            spawn(self._discover_new, address, name, seconds, sensors)
+        else:
+            spawn(self._scan_and_disco, name, seconds, sensors)
 
     def connect(self):
         spawn(self._connect_configured)
         
     def reschedule(self):
         self._schedule_read_jobs()
+
+    def _scan_and_disco(self, base_name, seconds, sensors):
+        existing = [t._addr for t in self._tags]
+        self._scanner.scan()
+        devices = [d for d in self._scanner._devices if d not in existing]
+        for idx, addr in enumerate(devices):
+            self._discover_new(addr,
+                               "{}-{}".format(base_name, idx),
+                               seconds,
+                               sensors)
 
     def _discover_new(self, address, name, seconds, sensors):
         cfg = AttributeDict({
