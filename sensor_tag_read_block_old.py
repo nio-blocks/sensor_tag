@@ -9,7 +9,6 @@ from nio.metadata.properties.holder import PropertyHolder
 from nio.metadata.properties.object import ObjectProperty
 from nio.metadata.properties.list import ListProperty
 from nio.metadata.properties.string import StringProperty
-from nio.metadata.properties.int import IntProperty
 from nio.metadata.properties.timedelta import TimeDeltaProperty
 from nio.metadata.properties.bool import BoolProperty
 from nio.common.command.params.int import IntParameter
@@ -39,104 +38,99 @@ class Sensors(PropertyHolder):
     # keys = BoolProperty(name="Keypress", default=False)
 
 
-class SensorTagMeta(PropertyHolder):
-    name = StringProperty(title='Name (human readable)', default='SensorTag')
-    read_interval = TimeDeltaProperty(
-        title="Device Read Interval", default=timedelta(seconds=10))
-    sensors = ObjectProperty(Sensors)
-
-
 class SensorTagInfo(PropertyHolder):
     address = StringProperty(title='Device Address', default='')
-    meta = ObjectProperty(SensorTagMeta)
+    name = StringProperty(title='Name (human readable)', default='')
+    read_interval = TimeDeltaProperty(title="Device Read Interval")
+    sensors = ObjectProperty(Sensors)
 
-
-@command("scan")
-@command("connect")
-@command("tag_config",
+@command("discover",
          StringParameter('address', default=''),
          StringParameter('name', default=''),
-         IntParameter('seconds', default=0),
-         ListParameter('sensors', default=[]))
+         IntParameter('seconds', default=1),
+         ListParameter('sensors', default=['IRtemperature']))
+@command("connect")
 @command("reschedule")
-@command("schedule_new")
+@command("scan")
 @Discoverable(DiscoverableType.block)
-class SensorTagRead2(Block):
+class SensorTagReadOld(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
-    default_metadata = ObjectProperty(SensorTagMeta)
-    scan_length = IntProperty(title="BLE Scan Length", default=5)
     
     def __init__(self):
         super().__init__()
-        self._scanner = LEScanner('SensorTag', 5)
-        self._configs = {}
+        self._scanner = LEScanner('SensorTag')
         self._tags = {}
         self._sensors = {}
         self._read_jobs = []
-        
+
     def configure(self, context):
         super().configure(context)
-        self._configs = self.persistence.load('configs') or self._configs
-        for cfg in self.device_info:
-            self._configs[cfg.address] = cfg
+        
+    def start(self):
+        super().start()
+        self._schedule_read_jobs()
 
     def stop(self):
         super().stop()
-        self.persistence.store('configs', self._configs)
-        self.persistence.save()
         self._cancel_existing_jobs()
 
-    def tag_config(address, name, seconds, sensors):
-        cfg = AttributeDict({
-            'address': address,
-            'name': "{}-{}".format(self.default_metadata.name, idx),
-            'read_interval': self.default_metadata.read_interval,
-            'sensors': self.default_metadata.sensors
-        })
- 
-        # if we're already aware of this device, amend the existing
-        # configuration
-        if address in self._configs:
-            cfg = self._configs[address]
-
-        cfg.name = name if name else cfg.name
-        cfg.read_interval = timedelta(seconds) if seconds > 0 \
-                            else cfg.read_interval
-        cfg.sensors = AttributeDict({
-            s: (s in sensors) for s in AVAIL_SENSORS
-        }) if sensors else cfg.sensors
-
-        self._configs[address] = cfg
-
-    def scan(self):
-        spawn(self._scan_helper)
-
-    def _scan_helper(self):
-        timeout = self._scanner.scan()
-        devices = [d for d in self._scanner._devices if d not in self._configs]
-        self._logger.info(
-            "{} new devices discovered in {} seconds".format(len(devices),
-                                                         timeout))
-        for idx, addr in enumerate(devices):
-            self._configs[addr] = AttributeDict({
-                'address': addr,
-                'name': "{}-{}".format(self.default_metadata.name, idx),
-                'read_interval': self.default_metadata.read_interval,
-                'sensors': self.default_metadata.sensors
-            })
+    def discover(self, address, name, seconds, sensors):
+        if address:
+            spawn(self._discover_new, address, name, seconds, sensors)
+        else:
+            spawn(self._scan_and_disco, name, seconds, sensors)
 
     def connect(self):
-        spawn(self._connect_tags)
+        spawn(self._connect_configured)
         
-    def _connect_tags(self):
-        for addr in self._configs:
-            if addr not in self._tags:
-                self._connect_tag(self._configs[addr])
-            if addr not in self._sensors:
-                sensors = self._get_sensors(*self._tags[addr])
-                [s.enable() for s in sensors]
-                self._sensors[addr] = sensors
+    def reschedule(self):
+        self._schedule_read_jobs()
+
+    def _scan_and_disco(self, base_name, seconds, sensors):
+        existing = [t._addr for t in self._tags]
+        devices = self._scanner.scan()
+        devices = [d for d in devices if d not in existing]
+        for idx, addr in enumerate(devices):
+            self._discover_new(addr,
+                               "{}-{}".format(base_name, idx),
+                               seconds,
+                               sensors)
+
+    def _discover_new(self, address, name, seconds, sensors):
+        cfg = AttributeDict({
+            'address': address,
+            'name': name,
+            'read_interval': timedelta(seconds=seconds),
+            'sensors': AttributeDict({
+                s: (s in sensors) for s in AVAIL_SENSORS
+            })
+        })
+        self._connect_tag(cfg)
+        cfg, tag = self._tags.get(address, (None, None))
+        if tag is not None:
+            sensors = self._get_sensors(cfg, tag)
+            [s.enable() for s in sensors]
+            self._sensors[address] = sensors
+            job = Job(self._read_from_tag, cfg.read_interval,
+                      True, cfg, self._sensors[address])
+            self._read_jobs.append(job)
+
+    def _connect_configured(self):
+        for cfg in self.device_info:
+            self._connect_tag(cfg)
+
+        self._logger.info(
+            "Successfully connected to {} SensorTags".format(
+                len(self._tags.keys()))
+        )
+
+        for addy in self._tags:
+            cfg, tag = self._tags[addy]
+            sensors = self._get_sensors(cfg, tag)
+            [s.enable() for s in sensors]
+            self._sensors[addy] = sensors
+
         self._schedule_read_jobs()
 
     def _connect_tag(self, cfg):
@@ -153,9 +147,6 @@ class SensorTagRead2(Block):
             )
         else:
             self._logger.info("Connected to device {}".format(addy))
-            
-    def reschedule(self):
-        self._schedule_read_jobs()
 
     def _schedule_read_jobs(self):
         self._cancel_existing_jobs()
