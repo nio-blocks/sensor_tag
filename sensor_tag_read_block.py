@@ -59,7 +59,7 @@ class SensorTagInfo(PropertyHolder):
          IntParameter('seconds', default=0),
          ListParameter('sensors', default=[]))
 @command("reschedule")
-@command("schedule_new")
+@command("list")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
@@ -87,7 +87,7 @@ class SensorTagRead(Block):
         self.persistence.save()
         self._cancel_existing_jobs()
 
-    def tag_config(address, name, seconds, sensors):
+    def tag_config(self, address, name, seconds, sensors):
         cfg = AttributeDict({
             'address': address,
             'name': "{}-{}".format(self.default_metadata.name, idx),
@@ -168,6 +168,9 @@ class SensorTagRead(Block):
 
     def _cancel_existing_jobs(self):
         [job.cancel() for job in self._read_jobs]
+
+    def list(self):
+        return list(self._configs.keys())
 
     def _get_sensors(self, cfg, tag):
         settings = cfg.sensors
