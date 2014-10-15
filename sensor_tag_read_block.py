@@ -53,13 +53,14 @@ class SensorTagInfo(PropertyHolder):
 
 @command("scan")
 @command("connect")
+@command("scan_and_connect")
 @command("tag_config",
          StringParameter('address', default=''),
          StringParameter('name', default=''),
          IntParameter('seconds', default=0),
          ListParameter('sensors', default=[]))
 @command("reschedule")
-@command("schedule_new")
+@command("list")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
@@ -83,16 +84,18 @@ class SensorTagRead(Block):
 
     def stop(self):
         super().stop()
+        self._scanner.stop()
         self.persistence.store('configs', self._configs)
         self.persistence.save()
         self._cancel_existing_jobs()
 
-    def tag_config(address, name, seconds, sensors):
+    def tag_config(self, address, name, seconds, sensors):
         cfg = AttributeDict({
             'address': address,
-            'name': "{}-{}".format(self.default_metadata.name, idx),
-            'read_interval': self.default_metadata.read_interval,
-            'sensors': self.default_metadata.sensors
+            'name': name,
+            'read_interval': timedelta(seconds=seconds) if seconds else \
+                self.default_metadata.read_interval,
+            'sensors': sensors or self.default_metadata.sensors
         })
  
         # if we're already aware of this device, amend the existing
@@ -108,6 +111,10 @@ class SensorTagRead(Block):
         }) if sensors else cfg.sensors
 
         self._configs[address] = cfg
+
+    def scan_and_connect(self):
+        self._scan_helper()
+        self.connect()
 
     def scan(self):
         spawn(self._scan_helper)
@@ -168,6 +175,9 @@ class SensorTagRead(Block):
 
     def _cancel_existing_jobs(self):
         [job.cancel() for job in self._read_jobs]
+
+    def list(self):
+        return self._configs
 
     def _get_sensors(self, cfg, tag):
         settings = cfg.sensors
