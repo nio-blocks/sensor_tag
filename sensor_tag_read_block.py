@@ -113,8 +113,11 @@ class SensorTagRead(Block):
         self._configs[address] = cfg
 
     def scan_and_connect(self):
+        spawn(self._scan_connect_help)
+
+    def _scan_connect_help(self):
         self._scan_helper()
-        self.connect()
+        self._connect_tags()
 
     def scan(self):
         spawn(self._scan_helper)
@@ -125,10 +128,10 @@ class SensorTagRead(Block):
         self._logger.info(
             "{} new devices discovered in {} seconds".format(len(devices),
                                                          timeout))
-        for idx, addr in enumerate(devices):
+        for addr in devices:
             self._configs[addr] = AttributeDict({
                 'address': addr,
-                'name': "{}-{}".format(self.default_metadata.name, idx),
+                'name': "{}-{}".format(self.default_metadata.name, len(self._configs)),
                 'read_interval': self.default_metadata.read_interval,
                 'sensors': self.default_metadata.sensors
             })
