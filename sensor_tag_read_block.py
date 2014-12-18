@@ -87,8 +87,10 @@ class SensorTagRead(Block):
             'address': device_info.address,
             'name': device_info.meta.name,
             'read_interval': device_info.meta.read_interval,
-            'sensors': [sensor for sensor in AVAIL_SENSORS \
-                        if getattr(device_info.meta.sensors, sensor)]
+            'sensors': AttributeDict({
+                sensor: getattr(device_info.meta.sensors, sensor) \
+                for sensor in AVAIL_SENSORS
+            })
         })
 
     def stop(self):
@@ -104,7 +106,8 @@ class SensorTagRead(Block):
             'name': name,
             'read_interval': timedelta(seconds=seconds) if seconds else \
                 self.default_metadata.read_interval,
-            'sensors': sensors or self.default_metadata.sensors
+            'sensors': self._sensor_list_to_attr_dict(sensors) or \
+                       self.default_metadata.sensors
         })
  
         # if we're already aware of this device, amend the existing
@@ -120,6 +123,9 @@ class SensorTagRead(Block):
         }) if sensors else cfg.sensors
 
         self._configs[address] = cfg
+
+    def _sensor_list_to_attr_dict(self, sensors):
+        return {sensor: True for sensor in sensors}
 
     def scan_and_connect(self):
         spawn(self._scan_connect_help)
