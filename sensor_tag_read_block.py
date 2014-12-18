@@ -1,6 +1,6 @@
 from datetime import timedelta
-from bluepy.bluepy.sensortag import SensorTag
-from bluepy.bluepy.btle import LEScanner
+from .bluepy.bluepy.sensortag import SensorTag
+from .bluepy.bluepy.btle import LEScanner
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
 from nio.common.command import command
@@ -87,8 +87,8 @@ class SensorTagRead(Block):
             'address': device_info.address,
             'name': device_info.meta.name,
             'read_interval': device_info.meta.read_interval,
-            'sensors': [sensor for sensor in \
-                        device_info.meta.sensors]
+            'sensors': [sensor for sensor in AVAIL_SENSORS \
+                        if getattr(device_info.meta.sensors, sensor)]
         })
 
     def stop(self):
