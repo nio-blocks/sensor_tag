@@ -80,7 +80,7 @@ class SensorTagRead(Block):
         super().configure(context)
         self._configs = self.persistence.load('configs') or self._configs
         for dev_info in self.device_info:
-            self._configs[cfg.address] = self._cfg_from_device_info(dev_info)
+            self._configs[dev_info.address] = self._cfg_from_device_info(dev_info)
 
     def _cfg_from_device_info(self, device_info):
         return AttributeDict({
