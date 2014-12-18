@@ -1,6 +1,6 @@
 from datetime import timedelta
-from .bluepy.bluepy.sensortag import SensorTag
-from .bluepy.bluepy.btle import LEScanner
+from bluepy.bluepy.sensortag import SensorTag
+from bluepy.bluepy.btle import LEScanner
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
 from nio.common.command import command
@@ -79,8 +79,17 @@ class SensorTagRead(Block):
     def configure(self, context):
         super().configure(context)
         self._configs = self.persistence.load('configs') or self._configs
-        for cfg in self.device_info:
-            self._configs[cfg.address] = cfg
+        for dev_info in self.device_info:
+            self._configs[cfg.address] = self._cfg_from_device_info(dev_info)
+
+    def _cfg_from_device_info(self, device_info):
+        return AttributeDict({
+            'address': device_info.address,
+            'name': device_info.meta.name,
+            'read_interval': device_info.meta.read_interval,
+            'sensors': [sensor for sensor in \
+                        device_info.meta.sensors]
+        })
 
     def stop(self):
         super().stop()
