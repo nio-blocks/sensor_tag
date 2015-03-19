@@ -39,7 +39,7 @@ Install bluetooth and bring up local device:
         
 And you're ready to rock. You'll find the usual block documentation below.
 
-## Method to connect to SensorTag and configure the Sensor Tag block in the Service Builder
+## Method to connect to SensorTag and configure the SensorTagRead block in the Service Builder
 
 Steps **A** and **B** must be done during a reboot/power cycle of the Raspberry Pi. Step **C** is neccesary every time you start a service using a SensorTag.
 
