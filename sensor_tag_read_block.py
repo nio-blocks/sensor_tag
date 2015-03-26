@@ -1,6 +1,8 @@
 from datetime import timedelta
+from time import sleep
 from .bluepy.bluepy.sensortag import SensorTag
-from .bluepy.bluepy.btle import LEScanner
+from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
+from .bluepy.bluepy.btle import LEScanner, BTLEException
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
 from nio.common.command import command
@@ -24,7 +26,8 @@ AVAIL_SENSORS = {
     'humidity': ['ambient_temp_degC', 'relative_humidity'],
     'magnetometer': ['x_uT', 'y_uT', 'z_uT'],
     'barometer': ['ambient_temp_degC', 'pressure_millibars'],
-    'gyroscope': ['x_deg_per_sec', 'y_deg_per_sec', 'z_deg_per_sec']
+    'gyroscope': ['x_deg_per_sec', 'y_deg_per_sec', 'z_deg_per_sec'],
+    'keypress': ['keys']
 }
 
 
@@ -35,7 +38,7 @@ class Sensors(PropertyHolder):
     magnetometer = BoolProperty(name="Magnetometer", default=False)
     barometer = BoolProperty(name="Barometer", default=False)
     gyroscope = BoolProperty(name="Gyroscope", default=False)
-    # keys = BoolProperty(name="Keypress", default=False)
+    keypress = BoolProperty(name="Keypress", default=False)
 
 
 class SensorTagMeta(PropertyHolder):
@@ -46,6 +49,25 @@ class SensorTagMeta(PropertyHolder):
 class SensorTagInfo(PropertyHolder):
     address = StringProperty(title='Device Address', default='')
     meta = ObjectProperty(SensorTagMeta)
+
+
+class KeypressDelegate(_KeypressDelegate):
+    """ Handle SensorTag button presses """
+
+    def __init__(self, logger, notify_signals):
+        super().__init__()
+        self._logger = logger
+        self.notify_signals = notify_signals
+
+    def onButtonUp(self, but):
+        self._logger.debug( "** " + self._button_desc[but] + " UP")
+        self.notify_signals(
+            [Signal({'button': self._button_desc[but], 'direction': 'up'})])
+
+    def onButtonDown(self, but):
+        self._logger.debug( "** " + self._button_desc[but] + " DOWN")
+        self.notify_signals(
+            [Signal({'button': self._button_desc[but], 'direction': 'down'})])
 
 
 @command("scan")
@@ -72,7 +94,6 @@ class SensorTagRead(Block):
 
     def configure(self, context):
         super().configure(context)
-        self._configs = self.persistence.load('configs') or self._configs
         for dev_info in self.device_info:
             self._configs[dev_info.address] = self._cfg_from_device_info(dev_info)
 
@@ -99,8 +120,6 @@ class SensorTagRead(Block):
     def stop(self):
         super().stop()
         self._scanner.stop()
-        self.persistence.store('configs', self._configs)
-        self.persistence.save()
 
     def tag_config(self, address, name, seconds, sensors):
         cfg = AttributeDict({
@@ -163,20 +182,50 @@ class SensorTagRead(Block):
         try:
             self._logger.info("Push {} side button NOW".format(name))
             self._tags[addy] = SensorTag(addy)
-            self._logger.debug("Enabling sensors: {}".format(addy))
-            sensors = self._get_sensors(addy)
-            [s.enable() for s in sensors]
-            self._logger.debug("Sensors enabled: {}".format(addy))
+            self._enable_sensors(addy)
         except Exception as e:
             self._logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
             # Make sure to remove tag if connect fails
             self._tags.pop(addy, None)
+            sleep(5)
             self._connect_tag(cfg)
         else:
             self._logger.info("Connected to device {}".format(addy))
+            if cfg.sensors.get('keypress', False):
+                self._logger.debug(
+                    "Enabling notification listening for keypress")
+                spawn(self._listen_for_notifications, addy)
             if read_on_connect:
+                self._logger.debug(
+                    "Reading from sensors on reconnect")
                 self._read_from_tag(addy)
+
+    def _enable_sensors(self, addy):
+        self._logger.debug("Enabling sensors: {}".format(addy))
+        sensors = self._get_sensors(addy)
+        for s in sensors:
+            s.enable()
+            if s.__class__.__name__ == 'KeypressSensor':
+                self._tags[addy].setDelegate(
+                    KeypressDelegate(self._logger, self.notify_signals))
+        self._logger.debug("Sensors enabled: {}".format(addy))
+
+    def _listen_for_notifications(self, addy):
+        tag = self._tags[addy]
+        reconnect = False
+        while True:
+            self._logger.debug("Waiting for notification")
+            try:
+                notification = tag.waitForNotifications(10)
+                self._logger.debug("Notification: {}".format(notification))
+            except BTLEException:
+                self._logger.exception('Error while waiting for notification')
+                reconnect = True
+                break
+        if reconnect:
+            self._reconnect(addy, False)
+
 
     def list(self):
         return self._configs
@@ -196,22 +245,29 @@ class SensorTagRead(Block):
             data['sensor_tag_address'] = cfg.address
             sig = Signal(data)
             self.notify_signals([sig])
-        except Exception as e:
-            if cfg.address in self._tags:
-                # this next line is temporary.
-                try:
-                    self._tags[cfg.address].disconnect()
-                except:
-                    pass
-                self._tags.pop(cfg.address, None)
-                self._logger.exception(
-                    "Error reading from {}. Reconnecting...".format(cfg.name))
-                # Connect to this tag again and read right away
-                self._connect_tag(cfg, True)
-            else:
-                self._logger.exception(
-                    "Lost connection to {}...consider reschedule".format(
-                        cfg.name))
+        except Exception:
+            self._logger.exception(
+                "Error reading from {}. Reconnecting...".format(cfg.name))
+            self._reconnect(addy)
+
+    def _reconnect(self, addy, read_on_connect=True):
+        spawn(self._reconnect_thread, addy, read_on_connect)
+
+    def _reconnect_thread(self, addy, read_on_connect=True):
+        cfg = self._configs[addy]
+        if cfg.address in self._tags:
+            # this next line is temporary.
+            try:
+                self._tags[cfg.address].disconnect()
+            except:
+                pass
+            self._tags.pop(cfg.address, None)
+            # Connect to this tag again and read right away
+            self._connect_tag(cfg, read_on_connect)
+        else:
+            self._logger.exception(
+                "Lost connection to {}...consider reschedule".format(
+                    cfg.name))
 
     def _read_and_process(self, sensor):
         data = sensor.read()
