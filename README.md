@@ -95,8 +95,18 @@ If succesful, you should see the output of the sensor tag show up in a log (assu
 2. Press the *Advertise* a few more times.
 3. Restart service, and proceed to steps 2-1 and 2-2 again.
 
+## Bring up Bluetooth when starting Raspberry Pi
+
+The easiest way to automatically bring up Bluetooth when booting the Raspberry Pi is to modify `/etc/rc.local`.
+
+```
+# Start Bluetooth
+sudo hciconfig hci0 down
+sudo hciconfig hci0 up
+```
+
 Properties
---------------
+----------
 
 -   **device_info**: A list of SensorTag configuration objects, which contain the following fields:   
     * **address**: The MAC address of the SensorTag device.
@@ -117,13 +127,13 @@ Properties
 
 
 Dependencies
-----------------
+------------
 
 -   [bluez](bluez.org/download)
 -   [bluepy](github.com:nio-blocks/bluepy.git)
 
 Commands
-----------------
+--------
 -   **scan**: Scan for (advertising) SensorTags within range. Before initiating a scan, it is a good idea to hit the side button on each of the SensorTags you want to discover; this tells the Tag device to start broadcasting its unique identification data, making it available for discovery. Discovered SensorTags are named iteratively based on the number of SensorTags already in the system (i.e. SensorTag-0, SensorTag-1, etc).
 -   **connect**: Connect to all discovered/configured SensorTag devices and schedule readings based on configured/default values.
 -   **scan_and_connect**: Perform both of the above actions, synchronously.
@@ -135,12 +145,11 @@ Commands
 -   **list**: Return a list of all the SensorTags currently loaded in the block.
 
 Input
--------
-
-None
+-----
+Sensor reads are triggered by every input signal.
 
 Output
----------
+------
 A signal for each SensorTag reading. Here's an example, for reference:
 
     {
