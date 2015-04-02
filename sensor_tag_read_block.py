@@ -48,6 +48,7 @@ class SensorTagInfo(PropertyHolder):
 
 
 class KeypressDelegate(_KeypressDelegate):
+
     """ Handle SensorTag button presses """
 
     def __init__(self, logger, notify_signals):
@@ -56,12 +57,12 @@ class KeypressDelegate(_KeypressDelegate):
         self.notify_signals = notify_signals
 
     def onButtonUp(self, but):
-        self._logger.debug( "** " + self._button_desc[but] + " UP")
+        self._logger.debug("** " + self._button_desc[but] + " UP")
         self.notify_signals(
             [Signal({'button': self._button_desc[but], 'direction': 'up'})])
 
     def onButtonDown(self, but):
-        self._logger.debug( "** " + self._button_desc[but] + " DOWN")
+        self._logger.debug("** " + self._button_desc[but] + " DOWN")
         self.notify_signals(
             [Signal({'button': self._button_desc[but], 'direction': 'down'})])
 
@@ -80,7 +81,8 @@ class SensorTagRead(Block):
     def configure(self, context):
         super().configure(context)
         for dev_info in self.device_info:
-            self._configs[dev_info.address] = self._cfg_from_device_info(dev_info)
+            self._configs[dev_info.address] = \
+                self._cfg_from_device_info(dev_info)
 
     def _cfg_from_device_info(self, device_info):
         return AttributeDict({
@@ -170,7 +172,7 @@ class SensorTagRead(Block):
     def _get_sensors(self, addy, tag=None):
         settings = self._configs[addy].sensors
         tag = tag or self._tags[addy]
-        return [getattr(tag, s) for s in AVAIL_SENSORS \
+        return [getattr(tag, s) for s in AVAIL_SENSORS
                 if getattr(settings, s)]
 
     def _read_from_tag(self, addy):
