@@ -1,9 +1,13 @@
 SensorTagRead
-==========
+=============
 
 Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.
 
-**NOTA BENE:** This block require root/sudo access. Instead of `run_nio`, use `sudo run_nio` when starting an instance which contains a service making use of SensorTagRead.
+SenorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.
+
+*keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.
+
+**NOTA BENE:** This block require root/sudo access when using 'scan'. Instead of `run_nio`, use `sudo run_nio` when starting an instance which contains a service making use of SensorTagRead.
 
 This block makes use of our fork of **bluepy**, a Python library which makes Pythonic communication with Bluetooth Low Energy devices transparent and smooth. Due to some limitations of the Linux bluetooth stack, direct communication with BLE devices is accomplished via a monolithic C executable which pipes data into our Python programs. Furthermore, **bluepy** is built for Linux (specifically targeting Raspberry Pi), so don't expect it to play nice with either the OSX or Windows Bluetooth infrastructure.
 
@@ -91,14 +95,23 @@ If succesful, you should see the output of the sensor tag show up in a log (assu
 2. Press the *Advertise* a few more times.
 3. Restart service, and proceed to steps 2-1 and 2-2 again.
 
+## Bring up Bluetooth when starting Raspberry Pi
+
+The easiest way to automatically bring up Bluetooth when booting the Raspberry Pi is to modify `/etc/rc.local`.
+
+```
+# Start Bluetooth
+sudo hciconfig hci0 down
+sudo hciconfig hci0 up
+```
+
 Properties
---------------
+----------
 
 -   **device_info**: A list of SensorTag configuration objects, which contain the following fields:   
     * **address**: The MAC address of the SensorTag device.
     * **meta**: SensorTag metadata object, containing the following fields:
         + **name**: Arbitrary human-readable name of the device. For your reference.
-        + **read_interval**: TimeDeltaProperty. Read this Tag at this interval.
         + **sensors**: A list of BoolProperties corresponding to the each of the sensors on the SensorTag:
             * **IRtemperature**
             * **accelerometer**
@@ -106,6 +119,7 @@ Properties
             * **magnetometer**
             * **barometer**
             * **gyroscope**
+            * **keypress**
             
 -   **default_metadata**: SensorTag metadata object which will be any for any SensorTags discovered after block configuration.
 
@@ -113,13 +127,13 @@ Properties
 
 
 Dependencies
-----------------
+------------
 
 -   [bluez](bluez.org/download)
 -   [bluepy](github.com:nio-blocks/bluepy.git)
 
 Commands
-----------------
+--------
 -   **scan**: Scan for (advertising) SensorTags within range. Before initiating a scan, it is a good idea to hit the side button on each of the SensorTags you want to discover; this tells the Tag device to start broadcasting its unique identification data, making it available for discovery. Discovered SensorTags are named iteratively based on the number of SensorTags already in the system (i.e. SensorTag-0, SensorTag-1, etc).
 -   **connect**: Connect to all discovered/configured SensorTag devices and schedule readings based on configured/default values.
 -   **scan_and_connect**: Perform both of the above actions, synchronously.
@@ -128,16 +142,14 @@ Commands
     * **name**: Arbitrary name. For your reference.
     * **seconds**: An integer representing the read interval (in seconds).
     * **sensors**: A list of sensors (strings) to read from. Should be taken from the list above. Case sensitive.
--   **reschedule**: Cancel existing read jobs and reschedule them. Can be done at any time, but is especially useful when one of the SensorTags fails or is disconnected.
 -   **list**: Return a list of all the SensorTags currently loaded in the block.
 
 Input
--------
-
-None
+-----
+Sensor reads are triggered by every input signal.
 
 Output
----------
+------
 A signal for each SensorTag reading. Here's an example, for reference:
 
     {
@@ -147,6 +159,15 @@ A signal for each SensorTag reading. Here's an example, for reference:
         "gyroscope": { <data> },
     }
 
+Keypress:
+
+* button: "Left button", "Right button", or "Both Buttons"
+* direction: "up" or "down
+
+    {
+        "button": "Left button",
+        "direction": "down",
+    }
 
 
 
