@@ -4,6 +4,7 @@ from .bluepy.bluepy.sensortag import SensorTag
 from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from .bluepy.bluepy.btle import BTLEException
 from nio.common.block.base import Block
+from nio.common.block.attribute import Output
 from nio.common.signal.base import Signal
 from nio.common.discovery import Discoverable, DiscoverableType
 from nio.metadata.properties.holder import PropertyHolder
@@ -80,6 +81,7 @@ class KeypressDelegate(_KeypressDelegate):
         )
 
 
+@Output("keypress")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
