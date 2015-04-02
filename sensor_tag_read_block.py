@@ -2,7 +2,7 @@ from datetime import timedelta
 from time import sleep
 from .bluepy.bluepy.sensortag import SensorTag
 from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
-from .bluepy.bluepy.btle import LEScanner, BTLEException
+from .bluepy.bluepy.btle import BTLEException
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
 from nio.common.discovery import Discoverable, DiscoverableType
@@ -48,8 +48,17 @@ class SensorTagInfo(PropertyHolder):
 
 
 class KeypressDelegate(_KeypressDelegate):
-
     """ Handle SensorTag button presses """
+
+    BUTTON_L = 0x02
+    BUTTON_R = 0x01
+    ALL_BUTTONS = (BUTTON_L | BUTTON_R)
+
+    _button_desc = {
+        BUTTON_L : "Left",
+        BUTTON_R : "Right",
+        ALL_BUTTONS : "Both"
+    }
 
     def __init__(self, logger, notify_signals):
         super().__init__()
@@ -59,12 +68,16 @@ class KeypressDelegate(_KeypressDelegate):
     def onButtonUp(self, but):
         self._logger.debug("** " + self._button_desc[but] + " UP")
         self.notify_signals(
-            [Signal({'button': self._button_desc[but], 'direction': 'up'})])
+            [Signal({'button': self._button_desc[but], 'direction': 'Up'})],
+            output_id='keypress'
+        )
 
     def onButtonDown(self, but):
         self._logger.debug("** " + self._button_desc[but] + " DOWN")
         self.notify_signals(
-            [Signal({'button': self._button_desc[but], 'direction': 'down'})])
+            [Signal({'button': self._button_desc[but], 'direction': 'Down'})],
+            output_id='keypress'
+        )
 
 
 @Discoverable(DiscoverableType.block)
@@ -74,7 +87,6 @@ class SensorTagRead(Block):
 
     def __init__(self):
         super().__init__()
-        self._scanner = LEScanner('SensorTag', 5)
         self._configs = {}
         self._tags = {}
 
@@ -106,7 +118,6 @@ class SensorTagRead(Block):
 
     def stop(self):
         super().stop()
-        self._scanner.stop()
 
     def connect(self):
         connecting_to = []
