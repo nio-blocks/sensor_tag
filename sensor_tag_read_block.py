@@ -181,8 +181,10 @@ class SensorTagRead(Block):
         name = cfg.name
         try:
             self._logger.info("Push {} side button NOW".format(name))
-            self._tags[addy] = SensorTag(addy)
-            self._enable_sensors(addy)
+            tag = SensorTag(addy)
+            self._enable_sensors(addy, tag)
+            # Save the tag to the list after connection and sensors enabled.
+            self._tags[addy] = tag
         except Exception as e:
             self._logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
@@ -201,9 +203,9 @@ class SensorTagRead(Block):
                     "Reading from sensors on reconnect")
                 self._read_from_tag(addy)
 
-    def _enable_sensors(self, addy):
+    def _enable_sensors(self, addy, tag):
         self._logger.debug("Enabling sensors: {}".format(addy))
-        sensors = self._get_sensors(addy)
+        sensors = self._get_sensors(addy, tag)
         for s in sensors:
             s.enable()
             if s.__class__.__name__ == 'KeypressSensor':
@@ -230,9 +232,10 @@ class SensorTagRead(Block):
     def list(self):
         return self._configs
 
-    def _get_sensors(self, addy):
+    def _get_sensors(self, addy, tag=None):
         settings = self._configs[addy].sensors
-        return [getattr(self._tags[addy], s) for s in AVAIL_SENSORS \
+        tag = tag or self._tags[addy]
+        return [getattr(tag, s) for s in AVAIL_SENSORS \
                 if getattr(settings, s)]
 
     def _read_from_tag(self, addy):
