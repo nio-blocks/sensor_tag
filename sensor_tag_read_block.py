@@ -81,6 +81,7 @@ class KeypressDelegate(_KeypressDelegate):
         )
 
 
+@Output("status")
 @Output("keypress")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
@@ -148,6 +149,7 @@ class SensorTagRead(Block):
             self._connect_tag(cfg)
         else:
             self._logger.info("Connected to device {}".format(addy))
+            self._notify_status_signal('Connected', addy)
             if cfg.sensors.get('keypress', False):
                 self._logger.debug(
                     "Enabling notification listening for keypress")
@@ -209,6 +211,7 @@ class SensorTagRead(Block):
     def _reconnect_thread(self, addy, read_on_connect=True):
         cfg = self._configs[addy]
         if cfg.address in self._tags:
+            self._notify_status_signal('Disconnected', addy)
             # this next line is temporary.
             try:
                 self._tags[cfg.address].disconnect()
@@ -226,3 +229,10 @@ class SensorTagRead(Block):
         data = sensor.read()
         attributes = AVAIL_SENSORS[sensor.ident]
         return {attr: data[idx] for idx, attr in enumerate(attributes)}
+
+    def _notify_status_signal(self, status, addy):
+        data = {'status': status}
+        cfg = self._configs[addy]
+        data['name'] = cfg.name
+        data['address'] = cfg.address
+        self.notify_signals([Signal(data)], output_id='status')
