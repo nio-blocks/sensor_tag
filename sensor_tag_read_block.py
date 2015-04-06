@@ -5,7 +5,6 @@ from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from .bluepy.bluepy.btle import LEScanner, BTLEException
 from nio.common.block.base import Block
 from nio.common.signal.base import Signal
-from nio.common.command import command
 from nio.common.discovery import Discoverable, DiscoverableType
 from nio.metadata.properties.holder import PropertyHolder
 from nio.metadata.properties.object import ObjectProperty
@@ -13,9 +12,6 @@ from nio.metadata.properties.list import ListProperty
 from nio.metadata.properties.string import StringProperty
 from nio.metadata.properties.int import IntProperty
 from nio.metadata.properties.bool import BoolProperty
-from nio.common.command.params.int import IntParameter
-from nio.common.command.params.list import ListParameter
-from nio.common.command.params.string import StringParameter
 from nio.modules.scheduler import Job
 from nio.modules.threading import spawn
 from nio.util.attribute_dict import AttributeDict
@@ -70,21 +66,10 @@ class KeypressDelegate(_KeypressDelegate):
             [Signal({'button': self._button_desc[but], 'direction': 'down'})])
 
 
-@command("scan")
-@command("connect")
-@command("scan_and_connect")
-@command("tag_config",
-         StringParameter('address', default=''),
-         StringParameter('name', default=''),
-         IntParameter('seconds', default=0),
-         ListParameter('sensors', default=[]))
-@command("list")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
-    default_metadata = ObjectProperty(SensorTagMeta)
-    scan_length = IntProperty(title="BLE Scan Length", default=5)
 
     def __init__(self):
         super().__init__()
@@ -120,52 +105,6 @@ class SensorTagRead(Block):
     def stop(self):
         super().stop()
         self._scanner.stop()
-
-    def tag_config(self, address, name, seconds, sensors):
-        cfg = AttributeDict({
-            'address': address,
-            'name': name,
-            'sensors': self._sensor_list_to_attr_dict(sensors) or \
-                       self.default_metadata.sensors
-        })
-
-        # if we're already aware of this device, amend the existing
-        # configuration
-        if address in self._configs:
-            cfg = self._configs[address]
-
-        cfg.name = name if name else cfg.name
-        cfg.sensors = AttributeDict({
-            s: (s in sensors) for s in AVAIL_SENSORS
-        }) if sensors else cfg.sensors
-
-        self._configs[address] = cfg
-
-    def _sensor_list_to_attr_dict(self, sensors):
-        return {sensor: True for sensor in sensors}
-
-    def scan_and_connect(self):
-        spawn(self._scan_connect_help)
-
-    def _scan_connect_help(self):
-        self._scan_helper()
-        self._connect_tags()
-
-    def scan(self):
-        spawn(self._scan_helper)
-
-    def _scan_helper(self):
-        timeout = self._scanner.scan()
-        devices = [d for d in self._scanner._devices if d not in self._configs]
-        self._logger.info(
-            "{} new devices discovered in {} seconds".format(len(devices),
-                                                         timeout))
-        for addr in devices:
-            self._configs[addr] = AttributeDict({
-                'address': addr,
-                'name': "{}-{}".format(self.default_metadata.name, len(self._configs)),
-                'sensors': self.default_metadata.sensors
-            })
 
     def connect(self):
         connecting_to = []
@@ -227,10 +166,6 @@ class SensorTagRead(Block):
                 break
         if reconnect:
             self._reconnect(addy, False)
-
-
-    def list(self):
-        return self._configs
 
     def _get_sensors(self, addy, tag=None):
         settings = self._configs[addy].sensors
