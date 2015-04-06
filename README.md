@@ -96,6 +96,9 @@ Input signals trigger the sensor reads. One signal will be notified for each inp
 
 Output
 ------
+
+### default
+
 A signal for each SensorTag reading. Here's an example, for reference:
 
     {
@@ -105,12 +108,12 @@ A signal for each SensorTag reading. Here's an example, for reference:
         "gyroscope": { <data> },
     }
 
-Keypress:
+### keypress
 
-* button: "Left button", "Right button", or "Both Buttons"
-* direction: "up" or "down
+* button: "Left", "Right", or "Both"
+* direction: "Up" or "Down"
 
     {
-        "button": "Left button",
-        "direction": "down",
+        "button": "Left",
+        "direction": "Down",
     }
