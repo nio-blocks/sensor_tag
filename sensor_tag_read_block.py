@@ -165,7 +165,7 @@ class SensorTagRead(Block):
         for s in sensors:
             s.enable()
             if s.__class__.__name__ == 'KeypressSensor':
-                self._tags[addy].setDelegate(
+                tag.setDelegate(
                     KeypressDelegate(self._logger, self.notify_signals))
         self._logger.debug("Sensors enabled: {}".format(addy))
 
