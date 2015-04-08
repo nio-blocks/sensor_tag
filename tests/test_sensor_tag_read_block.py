@@ -66,21 +66,25 @@ class TestSensorTagRead(NIOBlockTestCase):
         # wait for tag to connect and sensors to enable
         sleep(0.1)
         # Connected status is emitted on successful start.
-        self.assertEqual(1, len(self.signals['status']))
-        self.assertEqual('Connected', self.signals['status'][0].status)
+        self.assertEqual(3, len(self.signals['status']))
         self.assertEqual('SensorTag', self.signals['status'][0].name)
+        self.assertEqual('Connecting', self.signals['status'][0].status)
+        self.assertEqual('Enabling', self.signals['status'][1].status)
+        self.assertEqual('Connected', self.signals['status'][2].status)
         self.assertEqual('12:34:56:78:12:34',
                          self.signals['status'][0].address)
         # Connected status is emitted on successful start.
         blk._reconnect_thread(addy, read_on_connect=False)
         sleep(0.1)
-        self.assertEqual(3, len(self.signals['status']))
-        self.assertEqual('Disconnected', self.signals['status'][1].status)
-        self.assertEqual('Connected', self.signals['status'][2].status)
+        self.assertEqual(7, len(self.signals['status']))
+        self.assertEqual('Disconnected', self.signals['status'][3].status)
+        self.assertEqual('Connecting', self.signals['status'][4].status)
+        self.assertEqual('Enabling', self.signals['status'][5].status)
+        self.assertEqual('Connected', self.signals['status'][6].status)
         blk.stop()
         # Should stop emit a disconnect signal? What if we aad a feature in
         # the future where block can stop without stopping the service?
-        self.assertEqual(3, len(self.signals['status']))
+        self.assertEqual(7, len(self.signals['status']))
         self.assertEqual(0, len(self.signals['default']))
 
     def test_keypress_delegate(self, mock_tag):

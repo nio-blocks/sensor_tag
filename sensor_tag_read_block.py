@@ -14,7 +14,7 @@ from nio.metadata.properties.string import StringProperty
 from nio.metadata.properties.int import IntProperty
 from nio.metadata.properties.bool import BoolProperty
 from nio.modules.scheduler import Job
-from nio.modules.threading import spawn
+from nio.modules.threading import spawn, Lock
 from nio.util.attribute_dict import AttributeDict
 
 AVAIL_SENSORS = {
@@ -24,7 +24,7 @@ AVAIL_SENSORS = {
     'magnetometer': ['x_uT', 'y_uT', 'z_uT'],
     'barometer': ['ambient_temp_degC', 'pressure_millibars'],
     'gyroscope': ['x_deg_per_sec', 'y_deg_per_sec', 'z_deg_per_sec'],
-    'keypress': ['keys']
+    'keypress': []
 }
 
 
@@ -92,9 +92,11 @@ class SensorTagRead(Block):
         super().__init__()
         self._configs = {}
         self._tags = {}
+        self._read_lock = Lock()
 
     def configure(self, context):
         super().configure(context)
+        self._read_counter = 0
         for dev_info in self.device_info:
             self._configs[dev_info.address] = \
                 self._cfg_from_device_info(dev_info)
@@ -136,6 +138,8 @@ class SensorTagRead(Block):
         name = cfg.name
         try:
             self._logger.info("Push {} side button NOW".format(name))
+            self._logger.info("Connecting to device {}".format(addy))
+            self._notify_status_signal('Connecting', addy)
             tag = SensorTag(addy)
             self._enable_sensors(addy, tag)
             # Save the tag to the list after connection and sensors enabled.
@@ -143,6 +147,7 @@ class SensorTagRead(Block):
         except Exception as e:
             self._logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
+            self._notify_status_signal('Retrying', addy)
             # Make sure to remove tag if connect fails
             self._tags.pop(addy, None)
             sleep(5)
@@ -150,8 +155,9 @@ class SensorTagRead(Block):
         else:
             self._logger.info("Connected to device {}".format(addy))
             self._notify_status_signal('Connected', addy)
+            self._read_counter = 0
             if cfg.sensors.get('keypress', False):
-                self._logger.debug(
+                self._logger.info(
                     "Enabling notification listening for keypress")
                 spawn(self._listen_for_notifications, addy)
             if read_on_connect:
@@ -160,23 +166,25 @@ class SensorTagRead(Block):
                 self._read_from_tag(addy)
 
     def _enable_sensors(self, addy, tag):
-        self._logger.debug("Enabling sensors: {}".format(addy))
+        self._logger.info("Enabling sensors: {}".format(addy))
+        self._notify_status_signal('Enabling', addy)
         sensors = self._get_sensors(addy, tag)
         for s in sensors:
             s.enable()
             if s.__class__.__name__ == 'KeypressSensor':
                 tag.setDelegate(
                     KeypressDelegate(self._logger, self.notify_signals))
-        self._logger.debug("Sensors enabled: {}".format(addy))
+        self._logger.info("Sensors enabled: {}".format(addy))
 
     def _listen_for_notifications(self, addy):
         tag = self._tags[addy]
         reconnect = False
         while True:
-            self._logger.debug("Waiting for notification")
             try:
-                notification = tag.waitForNotifications(10)
-                self._logger.debug("Notification: {}".format(notification))
+                with self._read_lock:
+                    self._logger.debug("Waiting for notification")
+                    notification = tag.waitForNotifications(1)
+                    self._logger.debug("Notification: {}".format(notification))
             except BTLEException:
                 self._logger.exception('Error while waiting for notification')
                 reconnect = True
@@ -191,11 +199,22 @@ class SensorTagRead(Block):
                 if getattr(settings, s)]
 
     def _read_from_tag(self, addy):
+        """ Reads from sensors notify a Signal. """
+        # Don't let too many reads queue up when sensor reads are slow
+        if self._read_counter > 5:
+            self._logger.debug(
+                "Skipping read. Too many in progress: {}".format(addy))
+            return
         try:
+            self._read_counter += 1
             cfg = self._configs[addy]
             sensors = self._get_sensors(addy)
-            self._logger.debug("Reading from {}...".format(cfg.name))
-            data = {s.ident: self._read_and_process(s) for s in sensors}
+            with self._read_lock:
+                self._logger.debug("Reading from {}...".format(cfg.name))
+                # Don't read from 'keypress'
+                data = {s.ident: self._read_and_process(s) for s in sensors
+                        if s.ident != 'keypress'}
+                self._logger.debug("Finished reading from {}".format(cfg.name))
             data['sensor_tag_name'] = cfg.name
             data['sensor_tag_address'] = cfg.address
             sig = Signal(data)
@@ -204,6 +223,9 @@ class SensorTagRead(Block):
             self._logger.exception(
                 "Error reading from {}. Reconnecting...".format(cfg.name))
             self._reconnect(addy)
+        finally:
+            self._read_counter -= 1
+
 
     def _reconnect(self, addy, read_on_connect=True):
         spawn(self._reconnect_thread, addy, read_on_connect)
