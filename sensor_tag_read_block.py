@@ -5,6 +5,7 @@ from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from .bluepy.bluepy.btle import BTLEException
 from nio.common.block.base import Block
 from nio.common.block.attribute import Output
+from nio.common.versioning.dependency import DependsOn
 from nio.common.signal.base import Signal
 from nio.common.discovery import Discoverable, DiscoverableType
 from nio.metadata.properties.holder import PropertyHolder
@@ -13,6 +14,7 @@ from nio.metadata.properties.list import ListProperty
 from nio.metadata.properties.string import StringProperty
 from nio.metadata.properties.int import IntProperty
 from nio.metadata.properties.bool import BoolProperty
+from nio.metadata.properties.version import VersionProperty
 from nio.modules.scheduler import Job
 from nio.modules.threading import spawn, Lock
 from nio.util.attribute_dict import AttributeDict
@@ -83,10 +85,13 @@ class KeypressDelegate(_KeypressDelegate):
 
 @Output("status")
 @Output("keypress")
+@Output("sensors")
+@DependsOn("nio", "1.5.2")
 @Discoverable(DiscoverableType.block)
 class SensorTagRead(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
+    version = VersionProperty(version='1.0.0', min_version='1.0.0')
 
     def __init__(self):
         super().__init__()
@@ -218,14 +223,13 @@ class SensorTagRead(Block):
             data['sensor_tag_name'] = cfg.name
             data['sensor_tag_address'] = cfg.address
             sig = Signal(data)
-            self.notify_signals([sig])
+            self.notify_signals([sig], 'sensors')
         except Exception:
             self._logger.exception(
                 "Error reading from {}. Reconnecting...".format(cfg.name))
             self._reconnect(addy)
         finally:
             self._read_counter -= 1
-
 
     def _reconnect(self, addy, read_on_connect=True):
         spawn(self._reconnect_thread, addy, read_on_connect)

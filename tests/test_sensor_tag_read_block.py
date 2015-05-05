@@ -24,7 +24,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.signals = defaultdict(list)
 
     def test_template(self, mock_tag):
-        """ Use this test as a templage for creating new ones """
+        """ Use this test as a template for creating new ones """
         # wait for a notification but never actually handle one
         mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
@@ -43,8 +43,45 @@ class TestSensorTagRead(NIOBlockTestCase):
         # process signals and assert here
         blk.stop()
 
+    def test_sensors_signals(self, mock_tag):
+        # wait for a notification but never actually handle one
+        mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
+        blk = SensorTagRead()
+        addy = '12:34:56:78:12:34'
+        self.configure_block(blk, {
+            'device_info': [
+                {
+                    'address': addy,
+                    'meta': {
+                        'sensors': {'IRtemperature': True}
+                    }
+                }
+            ],
+            'log_level': 'DEBUG'
+        })
+        signals = [Signal()]
+        blk.start()
+        # wait for tag to connect and sensors to enable
+        sleep(0.1)
+        # process signals and assert here
+        blk._read_and_process = MagicMock()
+        # read from sensors
+        blk.process_signals([Signal()])
+        self.assertEqual(1, blk._read_and_process.call_count)
+        self.assertEqual(1, len(self.signals['sensors']))
+        self.assertDictEqual({'sensor_tag_address': addy,
+                              'sensor_tag_name': 'SensorTag'},
+                             self.signals['sensors'][0].to_dict())
+        # read from sensors again
+        blk.process_signals([Signal()])
+        self.assertEqual(2, blk._read_and_process.call_count)
+        self.assertEqual(2, len(self.signals['sensors']))
+        self.assertDictEqual({'sensor_tag_address': addy,
+                              'sensor_tag_name': 'SensorTag'},
+                             self.signals['sensors'][1].to_dict())
+        blk.stop()
+
     def test_status_signals(self, mock_tag):
-        """ Use this test as a templage for creating new ones """
         # wait for a notification but never actually handle one
         mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
@@ -85,7 +122,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         # Should stop emit a disconnect signal? What if we aad a feature in
         # the future where block can stop without stopping the service?
         self.assertEqual(7, len(self.signals['status']))
-        self.assertEqual(0, len(self.signals['default']))
+        self.assertEqual(0, len(self.signals['sensors']))
 
     def test_keypress_delegate(self, mock_tag):
         # wait for a notification but never actually handle one
@@ -120,5 +157,5 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.assertEqual(3, len(self.signals['keypress']))
         self.assertEqual('Both', self.signals['keypress'][2].button)
         self.assertEqual('Up', self.signals['keypress'][2].direction)
-        # Make sure no signals notified from default output
-        self.assertEqual(0, len(self.signals['default']))
+        # Make sure no signals notified from default sensors output
+        self.assertEqual(0, len(self.signals['sensors']))
