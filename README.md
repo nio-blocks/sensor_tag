@@ -3,7 +3,7 @@ SensorTagRead
 
 Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.
 
-SenorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.
+SensorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.
 
 *keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.
 
@@ -20,7 +20,7 @@ Any time you update your block, this step needs to be run again if any changes w
 
 ### Finding SensorTag using Bluetooth advertise and discovery
 
-The next step will help with obtaining the MAC address of the Sensor Tag. It is neccesary to verify that the computer can find the Sensor Tag first.
+The next step will help with obtaining the MAC address of the Sensor Tag. It is necessary to verify that the computer can find the Sensor Tag first.
 
 1. In the command line, enter the following:
 
@@ -86,7 +86,7 @@ Dependencies
 ------------
 
 -   [bluez](bluez.org/download)
--   [bluepy](github.com:nio-blocks/bluepy.git)
+-   [bluepy](https://github.com/nio-blocks/bluepy)
 
 Commands
 --------
@@ -114,10 +114,12 @@ A signal for each SensorTag reading. Here's an example, for reference:
 
 ### keypress
 
-* button: "Left", "Right", or "Both"
-* direction: "Up" or "Down"
+* button: `Left`, `Right`, or `Both`
+* direction: `Up` or `Down`
 
-    {
-        "button": "Left",
-        "direction": "Down",
-    }
+```
+  {
+    "button": "Left",
+    "direction": "Down",
+  }
+```
