@@ -1,23 +1,22 @@
 from datetime import timedelta
+from threading import Lock
 from time import sleep
 from .bluepy.bluepy.sensortag import SensorTag
 from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from .bluepy.bluepy.btle import BTLEException
-from nio.common.block.base import Block
-from nio.common.block.attribute import Output
-from nio.common.versioning.dependency import DependsOn
-from nio.common.signal.base import Signal
-from nio.common.discovery import Discoverable, DiscoverableType
-from nio.metadata.properties.holder import PropertyHolder
-from nio.metadata.properties.object import ObjectProperty
-from nio.metadata.properties.list import ListProperty
-from nio.metadata.properties.string import StringProperty
-from nio.metadata.properties.int import IntProperty
-from nio.metadata.properties.bool import BoolProperty
-from nio.metadata.properties.version import VersionProperty
+from nio.block.base import Block
+from nio.block.terminals import output
+from nio.signal.base import Signal
+from nio.util.discovery import discoverable
+from nio.properties.holder import PropertyHolder
+from nio.properties.object import ObjectProperty
+from nio.properties.list import ListProperty
+from nio.properties.string import StringProperty
+from nio.properties.int import IntProperty
+from nio.properties.bool import BoolProperty
+from nio.properties.version import VersionProperty
 from nio.modules.scheduler import Job
-from nio.modules.threading import spawn, Lock
-from nio.util.attribute_dict import AttributeDict
+from nio.util.threading.spawn import spawn
 
 AVAIL_SENSORS = {
     'IRtemperature': ['ambient_temp_degC', 'target_temp_degC'],
@@ -31,23 +30,24 @@ AVAIL_SENSORS = {
 
 
 class Sensors(PropertyHolder):
-    IRtemperature = BoolProperty(name="IR Temperature", default=True)
-    accelerometer = BoolProperty(name="Accelerometer", default=False)
-    humidity = BoolProperty(name="Humidity", default=False)
-    magnetometer = BoolProperty(name="Magnetometer", default=False)
-    barometer = BoolProperty(name="Barometer", default=False)
-    gyroscope = BoolProperty(name="Gyroscope", default=False)
-    keypress = BoolProperty(name="Keypress", default=False)
+    IRtemperature = BoolProperty(title="IR Temperature", default=True)
+    accelerometer = BoolProperty(title="Accelerometer", default=False)
+    humidity = BoolProperty(title="Humidity", default=False)
+    magnetometer = BoolProperty(title="Magnetometer", default=False)
+    barometer = BoolProperty(title="Barometer", default=False)
+    gyroscope = BoolProperty(title="Gyroscope", default=False)
+    keypress = BoolProperty(title="Keypress", default=False)
 
 
 class SensorTagMeta(PropertyHolder):
     name = StringProperty(title='Name (human readable)', default='SensorTag')
-    sensors = ObjectProperty(Sensors)
+    sensors = ObjectProperty(Sensors, title="Sensors", default=Sensors())
 
 
 class SensorTagInfo(PropertyHolder):
     address = StringProperty(title='Device Address', default='')
-    meta = ObjectProperty(SensorTagMeta)
+    meta = ObjectProperty(
+        SensorTagMeta, title="Sensors", default=SensorTagMeta())
 
 
 class KeypressDelegate(_KeypressDelegate):
@@ -65,29 +65,28 @@ class KeypressDelegate(_KeypressDelegate):
 
     def __init__(self, logger, notify_signals):
         super().__init__()
-        self._logger = logger
+        self.logger = logger
         self.notify_signals = notify_signals
 
     def onButtonUp(self, but):
-        self._logger.debug("** " + self._button_desc[but] + " UP")
+        self.logger.debug("** " + self._button_desc[but] + " UP")
         self.notify_signals(
             [Signal({'button': self._button_desc[but], 'direction': 'Up'})],
             output_id='keypress'
         )
 
     def onButtonDown(self, but):
-        self._logger.debug("** " + self._button_desc[but] + " DOWN")
+        self.logger.debug("** " + self._button_desc[but] + " DOWN")
         self.notify_signals(
             [Signal({'button': self._button_desc[but], 'direction': 'Down'})],
             output_id='keypress'
         )
 
 
-@Output("status")
-@Output("keypress")
-@Output("sensors")
-@DependsOn("nio", "1.5.2")
-@Discoverable(DiscoverableType.block)
+@output("status")
+@output("keypress")
+@output("sensors")
+@discoverable
 class SensorTagRead(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
@@ -102,22 +101,22 @@ class SensorTagRead(Block):
     def configure(self, context):
         super().configure(context)
         self._read_counter = 0
-        for dev_info in self.device_info:
-            self._configs[dev_info.address] = \
+        for dev_info in self.device_info():
+            self._configs[dev_info.address()] = \
                 self._cfg_from_device_info(dev_info)
 
     def _cfg_from_device_info(self, device_info):
-        return AttributeDict({
-            'address': device_info.address,
-            'name': device_info.meta.name,
-            'sensors': AttributeDict({
-                sensor: getattr(device_info.meta.sensors, sensor) \
+        return {
+            'address': device_info.address(),
+            'name': device_info.meta().name(),
+            'sensors': {
+                sensor: getattr(device_info.meta().sensors(), sensor)() \
                 for sensor in AVAIL_SENSORS
-            })
-        })
+            }
+        }
 
     def process_signals(self, signals, input_id='default'):
-        self._logger.debug('Processing Signals: {}'.format(len(signals)))
+        self.logger.debug('Processing Signals: {}'.format(len(signals)))
         for signal in signals:
             for addy in self._tags:
                 self._read_from_tag(addy)
@@ -139,18 +138,18 @@ class SensorTagRead(Block):
 
     def _connect_tag(self, cfg, read_on_connect=False):
         result = None
-        addy = cfg.address
-        name = cfg.name
+        addy = cfg["address"]
+        name = cfg["name"]
         try:
-            self._logger.info("Push {} side button NOW".format(name))
-            self._logger.info("Connecting to device {}".format(addy))
+            self.logger.info("Push {} side button NOW".format(name))
+            self.logger.info("Connecting to device {}".format(addy))
             self._notify_status_signal('Connecting', addy)
             tag = SensorTag(addy)
             self._enable_sensors(addy, tag)
             # Save the tag to the list after connection and sensors enabled.
             self._tags[addy] = tag
         except Exception as e:
-            self._logger.exception(
+            self.logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
             self._notify_status_signal('Retrying', addy)
             # Make sure to remove tag if connect fails
@@ -158,28 +157,28 @@ class SensorTagRead(Block):
             sleep(5)
             self._connect_tag(cfg)
         else:
-            self._logger.info("Connected to device {}".format(addy))
+            self.logger.info("Connected to device {}".format(addy))
             self._notify_status_signal('Connected', addy)
             self._read_counter = 0
-            if cfg.sensors.get('keypress', False):
-                self._logger.info(
+            if cfg["sensors"].get('keypress', False):
+                self.logger.info(
                     "Enabling notification listening for keypress")
                 spawn(self._listen_for_notifications, addy)
             if read_on_connect:
-                self._logger.debug(
+                self.logger.debug(
                     "Reading from sensors on reconnect")
                 self._read_from_tag(addy)
 
     def _enable_sensors(self, addy, tag):
-        self._logger.info("Enabling sensors: {}".format(addy))
+        self.logger.info("Enabling sensors: {}".format(addy))
         self._notify_status_signal('Enabling', addy)
         sensors = self._get_sensors(addy, tag)
         for s in sensors:
             s.enable()
             if s.__class__.__name__ == 'KeypressSensor':
                 tag.setDelegate(
-                    KeypressDelegate(self._logger, self.notify_signals))
-        self._logger.info("Sensors enabled: {}".format(addy))
+                    KeypressDelegate(self.logger, self.notify_signals))
+        self.logger.info("Sensors enabled: {}".format(addy))
 
     def _listen_for_notifications(self, addy):
         tag = self._tags[addy]
@@ -187,27 +186,26 @@ class SensorTagRead(Block):
         while True:
             try:
                 with self._read_lock:
-                    self._logger.debug("Waiting for notification")
+                    self.logger.debug("Waiting for notification")
                     notification = tag.waitForNotifications(1)
-                    self._logger.debug("Notification: {}".format(notification))
+                    self.logger.debug("Notification: {}".format(notification))
             except BTLEException:
-                self._logger.exception('Error while waiting for notification')
+                self.logger.exception('Error while waiting for notification')
                 reconnect = True
                 break
         if reconnect:
             self._reconnect(addy, False)
 
     def _get_sensors(self, addy, tag=None):
-        settings = self._configs[addy].sensors
+        settings = self._configs[addy]["sensors"]
         tag = tag or self._tags[addy]
-        return [getattr(tag, s) for s in AVAIL_SENSORS
-                if getattr(settings, s)]
+        return [getattr(tag, s) for s in AVAIL_SENSORS if settings.get(s)]
 
     def _read_from_tag(self, addy):
         """ Reads from sensors notify a Signal. """
         # Don't let too many reads queue up when sensor reads are slow
         if self._read_counter > 5:
-            self._logger.debug(
+            self.logger.debug(
                 "Skipping read. Too many in progress: {}".format(addy))
             return
         try:
@@ -215,18 +213,19 @@ class SensorTagRead(Block):
             cfg = self._configs[addy]
             sensors = self._get_sensors(addy)
             with self._read_lock:
-                self._logger.debug("Reading from {}...".format(cfg.name))
+                self.logger.debug("Reading from {}...".format(cfg["name"]))
                 # Don't read from 'keypress'
-                data = {s.ident: self._read_and_process(s) for s in sensors
-                        if s.ident != 'keypress'}
-                self._logger.debug("Finished reading from {}".format(cfg.name))
-            data['sensor_tag_name'] = cfg.name
-            data['sensor_tag_address'] = cfg.address
+                data = {s.ident: self._read_and_process(s)
+                        for s in sensors if s.ident != 'keypress'}
+                self.logger.debug(
+                    "Finished reading from {}".format(cfg["name"]))
+            data['sensor_tag_name'] = cfg["name"]
+            data['sensor_tag_address'] = cfg["address"]
             sig = Signal(data)
             self.notify_signals([sig], 'sensors')
         except Exception:
-            self._logger.exception(
-                "Error reading from {}. Reconnecting...".format(cfg.name))
+            self.logger.exception(
+                "Error reading from {}. Reconnecting...".format(cfg["name"]))
             self._reconnect(addy)
         finally:
             self._read_counter -= 1
@@ -236,20 +235,20 @@ class SensorTagRead(Block):
 
     def _reconnect_thread(self, addy, read_on_connect=True):
         cfg = self._configs[addy]
-        if cfg.address in self._tags:
+        if cfg["address"] in self._tags:
             self._notify_status_signal('Disconnected', addy)
             # this next line is temporary.
             try:
-                self._tags[cfg.address].disconnect()
+                self._tags[cfg["address"]].disconnect()
             except:
                 pass
-            self._tags.pop(cfg.address, None)
+            self._tags.pop(cfg["address"], None)
             # Connect to this tag again and read right away
             self._connect_tag(cfg, read_on_connect)
         else:
-            self._logger.exception(
+            self.logger.exception(
                 "Lost connection to {}...consider reschedule".format(
-                    cfg.name))
+                    cfg["name"]))
 
     def _read_and_process(self, sensor):
         data = sensor.read()
@@ -259,6 +258,6 @@ class SensorTagRead(Block):
     def _notify_status_signal(self, status, addy):
         data = {'status': status}
         cfg = self._configs[addy]
-        data['name'] = cfg.name
-        data['address'] = cfg.address
+        data['name'] = cfg["name"]
+        data['address'] = cfg["address"]
         self.notify_signals([Signal(data)], output_id='status')

@@ -1,9 +1,9 @@
 from time import sleep
 from collections import defaultdict
-from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
 from unittest.mock import MagicMock, patch
-from nio.util.support.block_test_case import NIOBlockTestCase
-from nio.common.signal.base import Signal
+from nio.signal.base import Signal
+from nio.testing.block_test_case import NIOBlockTestCase
+from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
 
 
 class SignalA(Signal):
@@ -16,34 +16,8 @@ class SignalA(Signal):
 @patch(SensorTagRead.__module__ + '.SensorTag')
 class TestSensorTagRead(NIOBlockTestCase):
 
-    def signals_notified(self, signals, output_id):
-        self.signals[output_id].extend(signals)
-
-    def setUp(self):
-        super().setUp()
-        self.signals = defaultdict(list)
-
-    def test_template(self, mock_tag):
-        """ Use this test as a template for creating new ones """
-        # wait for a notification but never actually handle one
-        mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
-        blk = SensorTagRead()
-        self.configure_block(blk, {
-            'device_info': [
-                {
-                    'address': '12:34:56:78:12:34'
-                }
-            ],
-            'log_level': 'DEBUG'
-        })
-        signals = [Signal()]
-        blk.start()
-        # wait for tag to connect and sensors to enable
-        sleep(0.1)
-        # process signals and assert here
-        blk.stop()
-
     def test_sensors_signals(self, mock_tag):
+        """Each processed signal results in one notified 'sensors' signal"""
         # wait for a notification but never actually handle one
         mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
@@ -64,24 +38,28 @@ class TestSensorTagRead(NIOBlockTestCase):
         # wait for tag to connect and sensors to enable
         sleep(0.1)
         # process signals and assert here
-        blk._read_and_process = MagicMock()
+        blk._read_and_process = MagicMock(side_effect=[42.0, 314])
+        mock_tag.return_value.IRtemperature.ident = "ir_temperature"
         # read from sensors
         blk.process_signals([Signal()])
         self.assertEqual(1, blk._read_and_process.call_count)
-        self.assertEqual(1, len(self.signals['sensors']))
+        self.assertEqual(1, len(self.last_notified['sensors']))
         self.assertDictEqual({'sensor_tag_address': addy,
-                              'sensor_tag_name': 'SensorTag'},
-                             self.signals['sensors'][0].to_dict())
+                              'sensor_tag_name': 'SensorTag',
+                              'ir_temperature': 42,},
+                             self.last_notified['sensors'][0].to_dict())
         # read from sensors again
         blk.process_signals([Signal()])
         self.assertEqual(2, blk._read_and_process.call_count)
-        self.assertEqual(2, len(self.signals['sensors']))
+        self.assertEqual(2, len(self.last_notified['sensors']))
         self.assertDictEqual({'sensor_tag_address': addy,
-                              'sensor_tag_name': 'SensorTag'},
-                             self.signals['sensors'][1].to_dict())
+                              'sensor_tag_name': 'SensorTag',
+                              'ir_temperature': 314,},
+                             self.last_notified['sensors'][1].to_dict())
         blk.stop()
 
     def test_status_signals(self, mock_tag):
+        """Connecting to the sensor tag notifies 'status' signals"""
         # wait for a notification but never actually handle one
         mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
@@ -103,28 +81,37 @@ class TestSensorTagRead(NIOBlockTestCase):
         # wait for tag to connect and sensors to enable
         sleep(0.1)
         # Connected status is emitted on successful start.
-        self.assertEqual(3, len(self.signals['status']))
-        self.assertEqual('SensorTag', self.signals['status'][0].name)
-        self.assertEqual('Connecting', self.signals['status'][0].status)
-        self.assertEqual('Enabling', self.signals['status'][1].status)
-        self.assertEqual('Connected', self.signals['status'][2].status)
+        self.assertEqual(3, len(self.last_notified['status']))
+        self.assertEqual('SensorTag',
+                         self.last_notified['status'][0].to_dict()["name"])
+        self.assertEqual('Connecting',
+                         self.last_notified['status'][0].to_dict()["status"])
+        self.assertEqual('Enabling',
+                         self.last_notified['status'][1].to_dict()["status"])
+        self.assertEqual('Connected',
+                         self.last_notified['status'][2].to_dict()["status"])
         self.assertEqual('12:34:56:78:12:34',
-                         self.signals['status'][0].address)
+                         self.last_notified['status'][0].to_dict()["address"])
         # Connected status is emitted on successful start.
         blk._reconnect_thread(addy, read_on_connect=False)
         sleep(0.1)
-        self.assertEqual(7, len(self.signals['status']))
-        self.assertEqual('Disconnected', self.signals['status'][3].status)
-        self.assertEqual('Connecting', self.signals['status'][4].status)
-        self.assertEqual('Enabling', self.signals['status'][5].status)
-        self.assertEqual('Connected', self.signals['status'][6].status)
+        self.assertEqual(7, len(self.last_notified['status']))
+        self.assertEqual('Disconnected',
+                         self.last_notified['status'][3].to_dict()["status"])
+        self.assertEqual('Connecting',
+                         self.last_notified['status'][4].to_dict()["status"])
+        self.assertEqual('Enabling',
+                         self.last_notified['status'][5].to_dict()["status"])
+        self.assertEqual('Connected',
+                         self.last_notified['status'][6].to_dict()["status"])
         blk.stop()
         # Should stop emit a disconnect signal? What if we aad a feature in
         # the future where block can stop without stopping the service?
-        self.assertEqual(7, len(self.signals['status']))
-        self.assertEqual(0, len(self.signals['sensors']))
+        self.assertEqual(7, len(self.last_notified['status']))
+        self.assertEqual(0, len(self.last_notified['sensors']))
 
     def test_keypress_delegate(self, mock_tag):
+        """Button presses notify 'keypress' signals"""
         # wait for a notification but never actually handle one
         mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
@@ -144,18 +131,18 @@ class TestSensorTagRead(NIOBlockTestCase):
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
-        delegate = KeypressDelegate(blk._logger, blk.notify_signals)
+        delegate = KeypressDelegate(blk.logger, blk.notify_signals)
         delegate.onButtonDown(0x02)
-        self.assertEqual(1, len(self.signals['keypress']))
-        self.assertEqual('Left', self.signals['keypress'][0].button)
-        self.assertEqual('Down', self.signals['keypress'][0].direction)
+        self.assertEqual(1, len(self.last_notified['keypress']))
+        self.assertEqual('Left', self.last_notified['keypress'][0].to_dict()["button"])
+        self.assertEqual('Down', self.last_notified['keypress'][0].to_dict()["direction"])
         delegate.onButtonUp(0x01)
-        self.assertEqual(2, len(self.signals['keypress']))
-        self.assertEqual('Right', self.signals['keypress'][1].button)
-        self.assertEqual('Up', self.signals['keypress'][1].direction)
+        self.assertEqual(2, len(self.last_notified['keypress']))
+        self.assertEqual('Right', self.last_notified['keypress'][1].to_dict()["button"])
+        self.assertEqual('Up', self.last_notified['keypress'][1].to_dict()["direction"])
         delegate.onButtonUp(0x02|0x01)
-        self.assertEqual(3, len(self.signals['keypress']))
-        self.assertEqual('Both', self.signals['keypress'][2].button)
-        self.assertEqual('Up', self.signals['keypress'][2].direction)
+        self.assertEqual(3, len(self.last_notified['keypress']))
+        self.assertEqual('Both', self.last_notified['keypress'][2].to_dict()["button"])
+        self.assertEqual('Up', self.last_notified['keypress'][2].to_dict()["direction"])
         # Make sure no signals notified from default sensors output
-        self.assertEqual(0, len(self.signals['sensors']))
+        self.assertEqual(0, len(self.last_notified['sensors']))
