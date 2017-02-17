@@ -1,9 +1,9 @@
 from datetime import timedelta
 from threading import Lock
 from time import sleep
-from .bluepy.bluepy.sensortag import SensorTag
-from .bluepy.bluepy.sensortag import KeypressDelegate as _KeypressDelegate
-from .bluepy.bluepy.btle import BTLEException
+from bluepy.sensortag import SensorTag
+from bluepy.sensortag import KeypressDelegate as _KeypressDelegate
+from bluepy.btle import BTLEException
 from nio.block.base import Block
 from nio.block.terminals import output
 from nio.signal.base import Signal
@@ -17,6 +17,16 @@ from nio.properties.bool import BoolProperty
 from nio.properties.version import VersionProperty
 from nio.modules.scheduler import Job
 from nio.util.threading.spawn import spawn
+
+SENSOR_MAPPINGS = {
+    'IRTemperatureSensor': 'IRtemperature',
+    'AccelerometerSensor': 'accelerometer',
+    'HumiditySensor': 'humidity',
+    'MagnetometerSensor': 'magnetometer',
+    'BarometerSensor': 'barometer',
+    'GyroscopeSensor': 'gyroscope',
+    'KeypressSensor': 'keypress',
+}
 
 AVAIL_SENSORS = {
     'IRtemperature': ['ambient_temp_degC', 'target_temp_degC'],
@@ -215,8 +225,8 @@ class SensorTagRead(Block):
             with self._read_lock:
                 self.logger.debug("Reading from {}...".format(cfg["name"]))
                 # Don't read from 'keypress'
-                data = {s.ident: self._read_and_process(s)
-                        for s in sensors if s.ident != 'keypress'}
+                data = {SENSOR_MAPPINGS[s.__class__.__name__]: self._read_and_process(s)
+                        for s in sensors if s.__class__.__name__ != 'KeypressSensor'}
                 self.logger.debug(
                     "Finished reading from {}".format(cfg["name"]))
             data['sensor_tag_name'] = cfg["name"]
@@ -252,7 +262,7 @@ class SensorTagRead(Block):
 
     def _read_and_process(self, sensor):
         data = sensor.read()
-        attributes = AVAIL_SENSORS[sensor.ident]
+        attributes = AVAIL_SENSORS[SENSOR_MAPPINGS[sensor.__class__.__name__]]
         return {attr: data[idx] for idx, attr in enumerate(attributes)}
 
     def _notify_status_signal(self, status, addy):
