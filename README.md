@@ -7,18 +7,20 @@ SensorTags are read from, and the block notifies a signal, each time a signal is
 
 *keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.
 
-## Bluetooth Setup
-
+Bluetooth Setup
+---------------
 This block makes use of our fork of **bluepy**, a Python library which makes Pythonic communication with Bluetooth Low Energy devices transparent and smooth. Due to some limitations of the Linux bluetooth stack, direct communication with BLE devices is accomplished via a monolithic C executable which pipes data into our Python programs. Furthermore, **bluepy** is built for Linux (specifically targeting Raspberry Pi), so don't expect it to play nice with either the OSX or Windows Bluetooth infrastructure.
 
-### Build **bluepy**
+Build **bluepy**
+---------------
 
 Any time you update your block, this step needs to be run again if any changes were made to bluepy:
 
         $ cd /path/to/sensor_tag/bluepy/bluepy
         $ sudo make
 
-### Finding SensorTag using Bluetooth advertise and discovery
+Finding SensorTag using Bluetooth advertise and discovery
+---------------
 
 The next step will help with obtaining the MAC address of the Sensor Tag. It is necessary to verify that the computer can find the Sensor Tag first.
 
@@ -40,7 +42,8 @@ In the command line, you should now see a list of MAC addresses, one of which wi
   - Replace the CR2032 battery in the SensorTag with a new one.
 - Beyond this - [resort to the manual from Texas Instruments](http://www.ti.com/lit/ml/swru324b/swru324b.pdf)
 
-### Install bluetooth/bluez (Raspberry Pi)
+Install bluetooth/bluez (Raspberry Pi)
+---------------
 
 On many devices (ex. Raspberry Pi), you will need to first get bluetooth support setup. If bluetooth is native to your device (ex. Intel Edison), these steps are not required.
 
@@ -60,7 +63,8 @@ On many devices (ex. Raspberry Pi), you will need to first get bluetooth support
 
 3. If your linux computer has a built-in bluetooth device, you may skip this step. Shut down the computer with `sudo shutdown -h now`, insert your USB Bluetooth dongle, and power up the computer.
 
-### Bring up local device (Raspberry Pi)
+Bring up local device (Raspberry Pi)
+---------------
 
 Bring up the local Bluetooth interface. The following command needs to be executed every time the Raspberry Pi is rebooted. Add this line to `/etc/rc.local` for it to happen automatically on system startup:
 
@@ -70,17 +74,11 @@ Properties
 ----------
 
 -   **device_info**: A list of SensorTag configuration objects, which contain the following fields:   
-    * **address**: The MAC address of the SensorTag device.
-    * **meta**: SensorTag metadata object, containing the following fields:
-        + **name**: Arbitrary human-readable name of the device. For your reference.
-        + **sensors**: A list of BoolProperties corresponding to the each of the sensors on the SensorTag:
-            * **IRtemperature**
-            * **accelerometer**
-            * **humidity**
-            * **magnetometer**
-            * **barometer**
-            * **gyroscope**
-            * **keypress**
+-   **address**: The MAC address of the SensorTag device.
+-   **meta**: SensorTag metadata object, containing the following fields:
+-   **name**: Arbitrary human-readable name of the device. For your reference.
+-   **sensors**: A list of BoolProperties corresponding to the each of the sensors on the SensorTag:
+-   **IRtemperature sensor**: Properties- accelerometer, humidity, magnetometer, barometer, gyroscope, keypress
 
 Dependencies
 ------------

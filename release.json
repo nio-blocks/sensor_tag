@@ -1,0 +1,7 @@
+{
+  "nio/SensorTagRead": {
+    "Version": "1.0.0",
+    "Reference": "github.com/nio-blocks/sensor_tag.git@v1.0.0",
+    "Language": "Python"
+  }
+}
