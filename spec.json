@@ -1,41 +1,41 @@
 {
-  "nio/SensorTagRead": {
-    "Commands": {},
-    "Properties": {
-      "name": {
-        "description": "Arbitrary human-readable name of the device. For your reference."
-      },
-      "IRtemperature sensor": {
-        "description": "Properties- accelerometer, humidity, magnetometer, barometer, gyroscope, keypress"
-      },
-      "device_info": {
-        "description": "A list of SensorTag configuration objects, which contain the following fields:"
-      },
-      "meta": {
-        "description": "SensorTag metadata object, containing the following fields:"
-      },
-      "sensors": {
-        "description": "A list of BoolProperties corresponding to the each of the sensors on the SensorTag:"
-      },
-      "address": {
-        "description": "The MAC address of the SensorTag device."
-      }
-    },
-    "Description": "Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.\nSensorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.\n*keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.",
-    "Category": "Hardware",
-    "Miscellaneous": {
-      "Bring up local device (Raspberry Pi)": "Bring up the local Bluetooth interface. The following command needs to be executed every time the Raspberry Pi is rebooted. Add this line to `/etc/rc.local` for it to happen automatically on system startup:\n$ sudo hciconfig hci0 up",
-      "Bluetooth Setup": "This block makes use of our fork of **bluepy**, a Python library which makes Pythonic communication with Bluetooth Low Energy devices transparent and smooth. Due to some limitations of the Linux bluetooth stack, direct communication with BLE devices is accomplished via a monolithic C executable which pipes data into our Python programs. Furthermore, **bluepy** is built for Linux (specifically targeting Raspberry Pi), so don't expect it to play nice with either the OSX or Windows Bluetooth infrastructure.",
-      "Finding SensorTag using Bluetooth advertise and discovery": "The next step will help with obtaining the MAC address of the Sensor Tag. It is necessary to verify that the computer can find the Sensor Tag first.\n1. In the command line, enter the following:\n$ sudo hcitool lescan\nIf `hcitool` does not exist, then first follow the steps below to *Install bluetooth/bluez*.\n2. Press the side button on the SensorTag to enter into 'advertising' mode. It will stay in this mode for 30 seconds after being pressed.\nIn the command line, you should now see a list of MAC addresses, one of which will be followed by 'SensorTag' - **_this is the MAC address you will need for configuring the Sensor Tag block in the Address field_**.\n**_Note:_** If you fail to see a MAC address show up with 'sensortag' following it:\n- It is possible that the 30 second window has elapsed from pressing the button, to performing the 'lescan'\n- Repeat steps 1 and 2 above, making sure to perform both within a 30 second window or less.\n- It is possible that the battery in the Sensor Tag is dead\n- Replace the CR2032 battery in the SensorTag with a new one.\n- Beyond this - [resort to the manual from Texas Instruments](http://www.ti.com/lit/ml/swru324b/swru324b.pdf)",
-      "Build **bluepy**": "Any time you update your block, this step needs to be run again if any changes were made to bluepy:\n$ cd /path/to/sensor_tag/bluepy/bluepy\n$ sudo make",
-      "Install bluetooth/bluez (Raspberry Pi)": "On many devices (ex. Raspberry Pi), you will need to first get bluetooth support setup. If bluetooth is native to your device (ex. Intel Edison), these steps are not required.\n1. Make sure supporting libraries are installed:\n$ sudo apt-get install libusb-dev libdbus-1-dev libglib2.0-dev libudev-dev libical-dev libreadline-dev\n2. Install bluez:\n$ sudo mkdir bluez ; cd bluez\n$ sudo wget www.kernel.org/pub/linux/bluetooth/bluez-5.24.tar.xz\n$ sudo unxz bluez-5.24.tar.xz\n$ cd bluez-5.24\n$ sudo ./configure --disable-systemd\n$ sudo make\n$ sudo make install\n3. If your linux computer has a built-in bluetooth device, you may skip this step. Shut down the computer with `sudo shutdown -h now`, insert your USB Bluetooth dongle, and power up the computer."
-    },
-    "Input": "Input signals trigger the sensor reads. One signal will be notified for each input signals for each connected SensorTag.",
-    "Version": "1.0.0",
-    "Output": "### default\nA signal for each SensorTag reading. Here's an example, for reference:\n{\n\"sensor_tag_name\": \"SensorTag-0\",\n\"sensor_tag_address\": \"B4:99:4C:64:30:9F\",\n\"IRtemperature\": { <data> },\n\"gyroscope\": { <data> },\n}\n### keypress\n* button: `Left`, `Right`, or `Both`\n* direction: `Up` or `Down`\n```\n{\n\"button\": \"Left\",\n\"direction\": \"Down\",\n}\n```",
-    "Dependencies": [
-      "-   [bluez](bluez.org/download)",
-      "-   [bluepy](https://github.com/nio-blocks/bluepy)"
-    ]
-  }
+    "nio/SensorTagRead": {
+        "Output": {
+            "Description": "### default\nA signal for each SensorTag reading. Here's an example, for reference:\n{\n\"sensor_tag_name\": \"SensorTag-0\",\n\"sensor_tag_address\": \"B4:99:4C:64:30:9F\",\n\"IRtemperature\": { <data> },\n\"gyroscope\": { <data> },\n}\n### keypress\n* button: `Left`, `Right`, or `Both`\n* direction: `Up` or `Down`\n```\n{\n\"button\": \"Left\",\n\"direction\": \"Down\",\n}\n```"
+        },
+        "Miscellaneous": {
+            "Bring up local device (Raspberry Pi)": "Bring up the local Bluetooth interface. The following command needs to be executed every time the Raspberry Pi is rebooted. Add this line to `/etc/rc.local` for it to happen automatically on system startup:\n$ sudo hciconfig hci0 up",
+            "Finding SensorTag using Bluetooth advertise and discovery": "The next step will help with obtaining the MAC address of the Sensor Tag. It is necessary to verify that the computer can find the Sensor Tag first.\n1. In the command line, enter the following:\n$ sudo hcitool lescan\nIf `hcitool` does not exist, then first follow the steps below to *Install bluetooth/bluez*.\n2. Press the side button on the SensorTag to enter into 'advertising' mode. It will stay in this mode for 30 seconds after being pressed.\nIn the command line, you should now see a list of MAC addresses, one of which will be followed by 'SensorTag' - **_this is the MAC address you will need for configuring the Sensor Tag block in the Address field_**.\n**_Note:_** If you fail to see a MAC address show up with 'sensortag' following it:\n- It is possible that the 30 second window has elapsed from pressing the button, to performing the 'lescan'\n- Repeat steps 1 and 2 above, making sure to perform both within a 30 second window or less.\n- It is possible that the battery in the Sensor Tag is dead\n- Replace the CR2032 battery in the SensorTag with a new one.\n- Beyond this - [resort to the manual from Texas Instruments](http://www.ti.com/lit/ml/swru324b/swru324b.pdf)",
+            "Install bluetooth/bluez (Raspberry Pi)": "On many devices (ex. Raspberry Pi), you will need to first get bluetooth support setup. If bluetooth is native to your device (ex. Intel Edison), these steps are not required.\n1. Make sure supporting libraries are installed:\n$ sudo apt-get install libusb-dev libdbus-1-dev libglib2.0-dev libudev-dev libical-dev libreadline-dev\n2. Install bluez:\n$ sudo mkdir bluez ; cd bluez\n$ sudo wget www.kernel.org/pub/linux/bluetooth/bluez-5.24.tar.xz\n$ sudo unxz bluez-5.24.tar.xz\n$ cd bluez-5.24\n$ sudo ./configure --disable-systemd\n$ sudo make\n$ sudo make install\n3. If your linux computer has a built-in bluetooth device, you may skip this step. Shut down the computer with `sudo shutdown -h now`, insert your USB Bluetooth dongle, and power up the computer.",
+            "Build **bluepy**": "Any time you update your block, this step needs to be run again if any changes were made to bluepy:\n$ cd /path/to/sensor_tag/bluepy/bluepy\n$ sudo make",
+            "Bluetooth Setup": "This block makes use of our fork of **bluepy**, a Python library which makes Pythonic communication with Bluetooth Low Energy devices transparent and smooth. Due to some limitations of the Linux bluetooth stack, direct communication with BLE devices is accomplished via a monolithic C executable which pipes data into our Python programs. Furthermore, **bluepy** is built for Linux (specifically targeting Raspberry Pi), so don't expect it to play nice with either the OSX or Windows Bluetooth infrastructure."
+        },
+        "Commands": {},
+        "Properties": {
+            "IRtemperature sensor": {
+                "description": "Properties- accelerometer, humidity, magnetometer, barometer, gyroscope, keypress"
+            },
+            "meta": {
+                "description": "SensorTag metadata object, containing the following fields:"
+            },
+            "name": {
+                "description": "Arbitrary human-readable name of the device. For your reference."
+            },
+            "device_info": {
+                "description": "A list of SensorTag configuration objects, which contain the following fields:"
+            },
+            "address": {
+                "description": "The MAC address of the SensorTag device."
+            },
+            "sensors": {
+                "description": "A list of BoolProperties corresponding to the each of the sensors on the SensorTag:"
+            }
+        },
+        "Version": "1.0.0",
+        "Description": "Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.\nSensorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.\n*keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.",
+        "Input": {
+            "Description": "Input signals trigger the sensor reads. One signal will be notified for each input signals for each connected SensorTag."
+        },
+        "Category": "Hardware"
+    }
 }
