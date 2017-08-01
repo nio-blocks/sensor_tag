@@ -1,8 +1,8 @@
+import sys
 from time import sleep
 from unittest.mock import MagicMock, patch
 from nio.signal.base import Signal
 from nio.testing.block_test_case import NIOBlockTestCase
-from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
 
 
 class SignalA(Signal):
@@ -12,26 +12,34 @@ class SignalA(Signal):
         self.a = a
 
 
-@patch(SensorTagRead.__module__ + '.SensorTag')
 class TestSensorTagRead(NIOBlockTestCase):
 
-    def test_sensors_signals(self, mock_tag):
+    def setUp(self):
+        super().setUp()
+        sys.modules['bluepy'] = MagicMock()
+        sys.modules['bluepy.sensortag'] = MagicMock()
+        sys.modules['bluepy.btle'] = MagicMock()
+        from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
+        global SensorTagRead, KeypressDelegate
+
+    def test_sensors_signals(self):
         """Each processed signal results in one notified 'sensors' signal"""
         # wait for a notification but never actually handle one
-        mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
         addy = '12:34:56:78:12:34'
-        self.configure_block(blk, {
-            'device_info': [
-                {
-                    'address': addy,
-                    'meta': {
-                        'sensors': {'IRtemperature': True}
+        with patch(SensorTagRead.__module__ + '.SensorTag') as mock_tag:
+            mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
+            self.configure_block(blk, {
+                'device_info': [
+                    {
+                        'address': addy,
+                        'meta': {
+                            'sensors': {'IRtemperature': True}
+                        }
                     }
-                }
-            ],
-            'log_level': 'DEBUG'
-        })
+                ],
+                'log_level': 'DEBUG'
+            })
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
@@ -56,24 +64,25 @@ class TestSensorTagRead(NIOBlockTestCase):
                              self.last_notified['sensors'][1].to_dict())
         blk.stop()
 
-    def test_status_signals(self, mock_tag):
+    def test_status_signals(self):
         """Connecting to the sensor tag notifies 'status' signals"""
         # wait for a notification but never actually handle one
-        mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
         addy = '12:34:56:78:12:34'
-        self.configure_block(blk, {
-            'device_info': [
-                {
-                    'address': addy,
-                    'meta': {
-                        'sensors': {'keypress': True,
-                                    'IRtemperature': False}
+        with patch(SensorTagRead.__module__ + '.SensorTag') as mock_tag:
+            mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
+            self.configure_block(blk, {
+                'device_info': [
+                    {
+                        'address': addy,
+                        'meta': {
+                            'sensors': {'keypress': True,
+                                        'IRtemperature': False}
+                        }
                     }
-                }
-            ],
-            'log_level': 'DEBUG'
-        })
+                ],
+                'log_level': 'DEBUG'
+            })
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
@@ -107,23 +116,24 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.assertEqual(7, len(self.last_notified['status']))
         self.assertEqual(0, len(self.last_notified['sensors']))
 
-    def test_keypress_delegate(self, mock_tag):
+    def test_keypress_delegate(self):
         """Button presses notify 'keypress' signals"""
         # wait for a notification but never actually handle one
-        mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
         blk = SensorTagRead()
-        self.configure_block(blk, {
-            'device_info': [
-                {
-                    'address': '12:34:56:78:12:34',
-                    'meta': {
-                        'sensors': {'keypress': True,
-                                    'IRtemperature': False}
+        with patch(SensorTagRead.__module__ + '.SensorTag') as mock_tag:
+            mock_tag.return_value.waitForNotifications = lambda x: sleep(10)
+            self.configure_block(blk, {
+                'device_info': [
+                    {
+                        'address': '12:34:56:78:12:34',
+                        'meta': {
+                            'sensors': {'keypress': True,
+                                        'IRtemperature': False}
+                        }
                     }
-                }
-            ],
-            'log_level': 'DEBUG'
-        })
+                ],
+                'log_level': 'DEBUG'
+            })
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
