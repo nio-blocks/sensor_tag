@@ -5,13 +5,6 @@ from nio.signal.base import Signal
 from nio.testing.block_test_case import NIOBlockTestCase
 
 
-class SignalA(Signal):
-
-    def __init__(self, a):
-        super().__init__()
-        self.a = a
-
-
 class TestSensorTagRead(NIOBlockTestCase):
 
     def setUp(self):
@@ -41,8 +34,6 @@ class TestSensorTagRead(NIOBlockTestCase):
                 'log_level': 'DEBUG'
             })
         blk.start()
-        # wait for tag to connect and sensors to enable
-        sleep(0.1)
         # process signals and assert here
         blk._read_and_process = MagicMock(side_effect=[42.0, 314])
         mock_tag.return_value.IRtemperature.ident = "ir_temperature"
@@ -52,7 +43,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.assertEqual(1, len(self.last_notified['sensors']))
         self.assertDictEqual({'sensor_tag_address': addy,
                               'sensor_tag_name': 'SensorTag',
-                              'ir_temperature': 42,},
+                              'ir_temperature': 42},
                              self.last_notified['sensors'][0].to_dict())
         # read from sensors again
         blk.process_signals([Signal()])
@@ -60,7 +51,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.assertEqual(2, len(self.last_notified['sensors']))
         self.assertDictEqual({'sensor_tag_address': addy,
                               'sensor_tag_name': 'SensorTag',
-                              'ir_temperature': 314,},
+                              'ir_temperature': 314},
                              self.last_notified['sensors'][1].to_dict())
         blk.stop()
 
@@ -135,20 +126,37 @@ class TestSensorTagRead(NIOBlockTestCase):
                 'log_level': 'DEBUG'
             })
         blk.start()
-        # wait for tag to connect and sensors to enable
-        sleep(0.1)
+        sleep(1)
         delegate = KeypressDelegate(blk.logger, blk.notify_signals)
         delegate.onButtonDown(0x02)
         self.assertEqual(1, len(self.last_notified['keypress']))
-        self.assertEqual('Left', self.last_notified['keypress'][0].to_dict()["button"])
-        self.assertEqual('Down', self.last_notified['keypress'][0].to_dict()["direction"])
+        self.assertEqual(
+            'Left',
+            self.last_notified['keypress'][0].to_dict()["button"]
+        )
+        self.assertEqual(
+            'Down',
+            self.last_notified['keypress'][0].to_dict()["direction"]
+        )
         delegate.onButtonUp(0x01)
         self.assertEqual(2, len(self.last_notified['keypress']))
-        self.assertEqual('Right', self.last_notified['keypress'][1].to_dict()["button"])
-        self.assertEqual('Up', self.last_notified['keypress'][1].to_dict()["direction"])
-        delegate.onButtonUp(0x02|0x01)
+        self.assertEqual(
+            'Right',
+            self.last_notified['keypress'][1].to_dict()["button"]
+        )
+        self.assertEqual(
+            'Up',
+            self.last_notified['keypress'][1].to_dict()["direction"]
+        )
+        delegate.onButtonUp(0x02 | 0x01)
         self.assertEqual(3, len(self.last_notified['keypress']))
-        self.assertEqual('Both', self.last_notified['keypress'][2].to_dict()["button"])
-        self.assertEqual('Up', self.last_notified['keypress'][2].to_dict()["direction"])
+        self.assertEqual(
+            'Both',
+            self.last_notified['keypress'][2].to_dict()["button"]
+        )
+        self.assertEqual(
+            'Up',
+            self.last_notified['keypress'][2].to_dict()["direction"]
+        )
         # Make sure no signals notified from default sensors output
         self.assertEqual(0, len(self.last_notified['sensors']))
