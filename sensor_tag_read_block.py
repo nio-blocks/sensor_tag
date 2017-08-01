@@ -1,4 +1,3 @@
-from datetime import timedelta
 from threading import Lock
 from time import sleep
 from bluepy.sensortag import SensorTag
@@ -12,10 +11,8 @@ from nio.properties.holder import PropertyHolder
 from nio.properties.object import ObjectProperty
 from nio.properties.list import ListProperty
 from nio.properties.string import StringProperty
-from nio.properties.int import IntProperty
 from nio.properties.bool import BoolProperty
 from nio.properties.version import VersionProperty
-from nio.modules.scheduler import Job
 from nio.util.threading.spawn import spawn
 
 SENSOR_MAPPINGS = {
@@ -68,9 +65,9 @@ class KeypressDelegate(_KeypressDelegate):
     ALL_BUTTONS = (BUTTON_L | BUTTON_R)
 
     _button_desc = {
-        BUTTON_L : "Left",
-        BUTTON_R : "Right",
-        ALL_BUTTONS : "Both"
+        BUTTON_L: "Left",
+        BUTTON_R: "Right",
+        ALL_BUTTONS: "Both"
     }
 
     def __init__(self, logger, notify_signals):
@@ -147,7 +144,6 @@ class SensorTagRead(Block):
         return connecting_to
 
     def _connect_tag(self, cfg, read_on_connect=False):
-        result = None
         addy = cfg["address"]
         name = cfg["name"]
         try:

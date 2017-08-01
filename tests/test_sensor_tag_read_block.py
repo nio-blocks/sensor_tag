@@ -1,5 +1,4 @@
 from time import sleep
-from collections import defaultdict
 from unittest.mock import MagicMock, patch
 from nio.signal.base import Signal
 from nio.testing.block_test_case import NIOBlockTestCase
@@ -33,7 +32,6 @@ class TestSensorTagRead(NIOBlockTestCase):
             ],
             'log_level': 'DEBUG'
         })
-        signals = [Signal()]
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
@@ -76,7 +74,6 @@ class TestSensorTagRead(NIOBlockTestCase):
             ],
             'log_level': 'DEBUG'
         })
-        signals = [Signal()]
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
@@ -127,7 +124,6 @@ class TestSensorTagRead(NIOBlockTestCase):
             ],
             'log_level': 'DEBUG'
         })
-        signals = [Signal()]
         blk.start()
         # wait for tag to connect and sensors to enable
         sleep(0.1)
