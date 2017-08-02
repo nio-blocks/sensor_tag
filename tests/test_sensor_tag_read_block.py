@@ -16,7 +16,8 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.mock_tag.SensorTag.return_value.IRtemperature.__class__.__name__ = 'IRTemperatureSensor'
         # mock this as an object since we want to actually use the
         # KeypressDelegate object defined in the block code, but not the one
-        # in the bluepy code.
+        # in the bluepy code. This way the block code KeypressDelegate inherits
+        # from an object and not a mock
         self.mock_tag.KeypressDelegate = object
         # now that everything is mocked, import the objects and let them mock
         # themselves. Make global here to avoid importing the library at the
