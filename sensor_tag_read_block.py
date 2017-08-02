@@ -232,7 +232,7 @@ class SensorTagRead(Block):
         except Exception:
             self.logger.exception(
                 "Error reading from {}. Reconnecting...".format(cfg["name"]))
-            #self._reconnect(addy)
+            self._reconnect(addy)
         finally:
             self._read_counter -= 1
 

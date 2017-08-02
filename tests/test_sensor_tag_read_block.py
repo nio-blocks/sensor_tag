@@ -1,6 +1,6 @@
 import sys
 from time import sleep
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from nio.signal.base import Signal
 from nio.testing.block_test_case import NIOBlockTestCase
 
@@ -17,6 +17,13 @@ class TestSensorTagRead(NIOBlockTestCase):
             lambda x: sleep(10)
         self.mock_tag.SensorTag.return_value.keypress.__class__.__name__ = 'KeypressSensor'
         self.mock_tag.SensorTag.return_value.IRtemperature.__class__.__name__ = 'IRTemperatureSensor'
+        # mock this as an object since we want to actually use the
+        # KeypressDelegate object defined in the block code, but not the one
+        # in the bluepy code.
+        self.mock_tag.KeypressDelegate = object
+        # now that everything is mocked, import the objects and let them mock
+        # themselves. Make global here to avoid importing the library at the
+        # top, which will auto-fail because we can't install this library.
         from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
         global SensorTagRead, KeypressDelegate
 
@@ -65,7 +72,6 @@ class TestSensorTagRead(NIOBlockTestCase):
         # wait for a notification but never actually handle one
         blk = SensorTagRead()
         addy = '12:34:56:78:12:34'
-        mock_tag = sys.modules['bluepy.sensortag'].SensorTag
         self.configure_block(blk, {
             'device_info': [
                 {
@@ -80,7 +86,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         })
         blk.start()
         # wait for tag to connect and sensors to enable
-        sleep(0.1)
+        from time import sleep; sleep(0.1)
         # Connected status is emitted on successful start.
         self.assertEqual(3, len(self.last_notified['status']))
         self.assertEqual('SensorTag',
@@ -95,7 +101,7 @@ class TestSensorTagRead(NIOBlockTestCase):
                          self.last_notified['status'][0].to_dict()["address"])
         # Connected status is emitted on successful start.
         blk._reconnect_thread(addy, read_on_connect=False)
-        sleep(0.1)
+        from time import sleep; sleep(0.1)
         self.assertEqual(7, len(self.last_notified['status']))
         self.assertEqual('Disconnected',
                          self.last_notified['status'][3].to_dict()["status"])
@@ -128,7 +134,7 @@ class TestSensorTagRead(NIOBlockTestCase):
             'log_level': 'DEBUG'
         })
         blk.start()
-        sleep(1)
+        from time import sleep; sleep(0.1)
         delegate = KeypressDelegate(blk.logger, blk.notify_signals)
         delegate.onButtonDown(0x02)
         self.assertEqual(1, len(self.last_notified['keypress']))
