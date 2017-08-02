@@ -16,6 +16,7 @@ class TestSensorTagRead(NIOBlockTestCase):
         self.mock_tag.SensorTag.return_value.waitForNotifications = \
             lambda x: sleep(10)
         self.mock_tag.SensorTag.return_value.keypress.__class__.__name__ = 'KeypressSensor'
+        self.mock_tag.SensorTag.return_value.IRtemperature.__class__.__name__ = 'IRTemperatureSensor'
         from ..sensor_tag_read_block import SensorTagRead, KeypressDelegate
         global SensorTagRead, KeypressDelegate
 
@@ -24,7 +25,6 @@ class TestSensorTagRead(NIOBlockTestCase):
         # wait for a notification but never actually handle one
         blk = SensorTagRead()
         addy = '12:34:56:78:12:34'
-        self.mock_tag.SensorTag.return_value.IRtemperature.__class__.__name__ = 'IRTemperatureSensor'
         self.configure_block(blk, {
             'device_info': [
                 {
