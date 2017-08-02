@@ -13,8 +13,6 @@ class TestSensorTagRead(NIOBlockTestCase):
         sys.modules['bluepy'] = MagicMock()
         sys.modules['bluepy.sensortag'] = self.mock_tag
         sys.modules['bluepy.btle'] = MagicMock()
-        self.mock_tag.SensorTag.return_value.waitForNotifications = \
-            lambda x: sleep(10)
         self.mock_tag.SensorTag.return_value.keypress.__class__.__name__ = 'KeypressSensor'
         self.mock_tag.SensorTag.return_value.IRtemperature.__class__.__name__ = 'IRTemperatureSensor'
         # mock this as an object since we want to actually use the
