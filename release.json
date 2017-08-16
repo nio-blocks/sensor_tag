@@ -2,6 +2,6 @@
   "nio/SensorTagRead": {
     "language": "Python",
     "version": "0.0.1",
-    "reference": "github.com/nio-blocks/sensor_tag.git@v0.0.1"
+    "url": "git://github.com/nio-blocks/sensor_tag.git"
   }
 }
