@@ -1,10 +1,31 @@
 {
   "nio/SensorTagRead": {
-    "version": "0.0.1",
-    "description": "",
-    "inputs": {},
-    "outputs": {},
-    "properties": {},
+    "version": "1.0.0",
+    "description": "Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.  SensorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.  *keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.",
+    "properties": {
+      "device_info": {
+        "title": "Sensor Tag Config",
+        "type": "ListType",
+        "description": "A list of SensorTag configuration objects.  More details can be found at the bottom of README.md",
+        "default": []
+      }
+    },
+    "inputs": {
+      "default": {
+        "description": "Input signals trigger the sensor reads. One signal will be notified for each input signals for each connected SensorTag."
+      }
+    },
+    "outputs": {
+      "keypress": {
+        "description": "A signal containing information about the button pressed and direction."
+      },
+      "sensors": {
+        "description": "A signal for each SensorTag reading."
+      },
+      "status": {
+        "description": "A signal for each SensorTag reading."
+      }
+    },
     "commands": {}
   }
 }
