@@ -3,16 +3,12 @@ from time import sleep
 from bluepy.sensortag import SensorTag
 from bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from bluepy.btle import BTLEException
+
 from nio.block.base import Block
 from nio.block.terminals import output
 from nio.signal.base import Signal
-from nio.util.discovery import discoverable
-from nio.properties.holder import PropertyHolder
-from nio.properties.object import ObjectProperty
-from nio.properties.list import ListProperty
-from nio.properties.string import StringProperty
-from nio.properties.bool import BoolProperty
-from nio.properties.version import VersionProperty
+from nio.properties import PropertyHolder, ObjectProperty, ListProperty, \
+    StringProperty, BoolProperty, VersionProperty
 from nio.util.threading.spawn import spawn
 
 SENSOR_MAPPINGS = {
@@ -93,11 +89,10 @@ class KeypressDelegate(_KeypressDelegate):
 @output("status")
 @output("keypress")
 @output("sensors")
-@discoverable
 class SensorTagRead(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
-    version = VersionProperty(version='1.0.0', min_version='1.0.0')
+    version = VersionProperty('1.0.0')
 
     def __init__(self):
         super().__init__()
@@ -117,7 +112,7 @@ class SensorTagRead(Block):
             'address': device_info.address(),
             'name': device_info.meta().name(),
             'sensors': {
-                sensor: getattr(device_info.meta().sensors(), sensor)() \
+                sensor: getattr(device_info.meta().sensors(), sensor)()
                 for sensor in AVAIL_SENSORS
             }
         }
@@ -221,8 +216,11 @@ class SensorTagRead(Block):
             with self._read_lock:
                 self.logger.debug("Reading from {}...".format(cfg["name"]))
                 # Don't read from 'keypress'
-                data = {SENSOR_MAPPINGS[s.__class__.__name__]: self._read_and_process(s)
-                        for s in sensors if s.__class__.__name__ != 'KeypressSensor'}
+                data = {
+                    SENSOR_MAPPINGS[s.__class__.__name__]:
+                        self._read_and_process(s) for s in sensors
+                        if s.__class__.__name__ != 'KeypressSensor'
+                }
                 self.logger.debug(
                     "Finished reading from {}".format(cfg["name"]))
             data['sensor_tag_name'] = cfg["name"]
