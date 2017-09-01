@@ -92,7 +92,7 @@ class KeypressDelegate(_KeypressDelegate):
 class SensorTagRead(Block):
 
     device_info = ListProperty(SensorTagInfo, title="Sensor Tag Config")
-    version = VersionProperty('1.0.0')
+    version = VersionProperty("1.0.0")
 
     def __init__(self):
         super().__init__()
