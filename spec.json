@@ -2,6 +2,9 @@
   "nio/SensorTagRead": {
     "version": "1.0.0",
     "description": "Block (and supporting library) for discovering, connecting to, and reading from TI SensorTags.  SensorTags are read from, and the block notifies a signal, each time a signal is processed by SensorTagRead.  *keypress* can be turned on to read button presses from the SensorTag. Note that a SensorTag can not be configured to use *keypress* if other sensors are also being used. Any input signal into the block will break the block if *keypress* is enabled.",
+    "categories": [
+      "Hardware"
+    ],
     "properties": {
       "device_info": {
         "title": "Sensor Tag Config",
