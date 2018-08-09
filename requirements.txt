@@ -1,1 +1,1 @@
-bluepy
+bluepy~=1.2.0
