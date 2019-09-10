@@ -19,6 +19,7 @@ SENSOR_MAPPINGS = {
     'BarometerSensor': 'barometer',
     'GyroscopeSensor': 'gyroscope',
     'KeypressSensor': 'keypress',
+    'AccelerometerSensorMPU9250': 'accelerometer',
 }
 
 AVAIL_SENSORS = {
