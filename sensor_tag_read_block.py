@@ -150,7 +150,8 @@ class SensorTagRead(Block):
             self._enable_sensors(addy, tag)
             # Save the tag to the list after connection and sensors enabled.
             self._tags[addy] = tag
-        except Exception as e:
+            return
+        except:
             self.logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
             self._notify_status_signal('Retrying', addy)
@@ -170,6 +171,8 @@ class SensorTagRead(Block):
                 self.logger.debug(
                     "Reading from sensors on reconnect")
                 self._read_from_tag(addy)
+            return
+        spawn(self._connect_tag(cfg))
 
     def _enable_sensors(self, addy, tag):
         self.logger.info("Enabling sensors: {}".format(addy))
@@ -207,7 +210,7 @@ class SensorTagRead(Block):
         """ Reads from sensors notify a Signal. """
         # Don't let too many reads queue up when sensor reads are slow
         if self._read_counter > 5:
-            self.logger.debug(
+            self.logger.warning(
                 "Skipping read. Too many in progress: {}".format(addy))
             return
         try:
