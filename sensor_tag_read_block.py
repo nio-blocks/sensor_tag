@@ -149,14 +149,12 @@ class SensorTagRead(Block):
             self._enable_sensors(addy, tag)
             # Save the tag to the list after connection and sensors enabled.
             self._tags[addy] = tag
-            return
         except:
             self.logger.exception(
                 "Failed to connect to {} ({}). Retrying...".format(name, addy))
             self._notify_status_signal('Retrying', addy)
             # Make sure to remove tag if connect fails
             self._tags.pop(addy, None)
-            self._connect_tag(cfg)
         else:
             self.logger.info("Connected to device {}".format(addy))
             self._notify_status_signal('Connected', addy)
