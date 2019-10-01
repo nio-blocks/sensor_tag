@@ -1,5 +1,4 @@
 from threading import Lock
-from time import sleep
 from bluepy.sensortag import SensorTag
 from bluepy.sensortag import KeypressDelegate as _KeypressDelegate
 from bluepy.btle import BTLEException
@@ -157,7 +156,6 @@ class SensorTagRead(Block):
             self._notify_status_signal('Retrying', addy)
             # Make sure to remove tag if connect fails
             self._tags.pop(addy, None)
-            sleep(5)
             self._connect_tag(cfg)
         else:
             self.logger.info("Connected to device {}".format(addy))
