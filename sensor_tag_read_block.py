@@ -141,34 +141,34 @@ class SensorTagRead(Block):
     def _connect_tag(self, cfg, read_on_connect=False):
         addy = cfg["address"]
         name = cfg["name"]
-        try:
-            self.logger.info("Push {} side button NOW".format(name))
-            self.logger.info("Connecting to device {}".format(addy))
-            self._notify_status_signal('Connecting', addy)
-            tag = SensorTag(addy)
-            self._enable_sensors(addy, tag)
-            # Save the tag to the list after connection and sensors enabled.
-            self._tags[addy] = tag
-        except:
-            self.logger.exception(
-                "Failed to connect to {} ({}). Retrying...".format(name, addy))
-            self._notify_status_signal('Retrying', addy)
-            # Make sure to remove tag if connect fails
-            self._tags.pop(addy, None)
-        else:
-            self.logger.info("Connected to device {}".format(addy))
-            self._notify_status_signal('Connected', addy)
-            self._read_counter = 0
-            if cfg["sensors"].get('keypress', False):
-                self.logger.info(
-                    "Enabling notification listening for keypress")
-                spawn(self._listen_for_notifications, addy)
-            if read_on_connect:
-                self.logger.debug(
-                    "Reading from sensors on reconnect")
-                self._read_from_tag(addy)
-            return
-        spawn(self._connect_tag(cfg))
+        while addy not in self._tags:
+            try:
+                self.logger.info("Push {} side button NOW".format(name))
+                self.logger.info("Connecting to device {}".format(addy))
+                self._notify_status_signal('Connecting', addy)
+                tag = SensorTag(addy)
+                self._enable_sensors(addy, tag)
+                # Save tag to the list after connection and sensors enabled
+                self._tags[addy] = tag
+            except:
+                self.logger.exception(
+                    "Failed to connect to {} ({}). Retrying...".format(
+                        name, addy))
+                self._notify_status_signal('Retrying', addy)
+                # Make sure to remove tag if connect fails
+                self._tags.pop(addy, None)
+            else:
+                self.logger.info("Connected to device {}".format(addy))
+                self._notify_status_signal('Connected', addy)
+                self._read_counter = 0
+                if cfg["sensors"].get('keypress', False):
+                    self.logger.info(
+                        "Enabling notification listening for keypress")
+                    spawn(self._listen_for_notifications, addy)
+                if read_on_connect:
+                    self.logger.debug(
+                        "Reading from sensors on reconnect")
+                    self._read_from_tag(addy)
 
     def _enable_sensors(self, addy, tag):
         self.logger.info("Enabling sensors: {}".format(addy))
