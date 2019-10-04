@@ -227,12 +227,12 @@ class SensorTagRead(Block):
             data['sensor_tag_address'] = cfg["address"]
             sig = Signal(data)
             self.notify_signals([sig], 'sensors')
+            self._read_counter -= 1
         except Exception:
             self.logger.exception(
                 "Error reading from {}. Reconnecting...".format(cfg["name"]))
-            self._reconnect(addy)
-        finally:
             self._read_counter -= 1
+            self._reconnect(addy)
 
     def _reconnect(self, addy, read_on_connect=True):
         spawn(self._reconnect_thread, addy, read_on_connect)
